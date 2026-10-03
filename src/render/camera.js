@@ -3,6 +3,7 @@
 // planet, and flies the hole intro from the cup back to the tee.
 import * as THREE from 'three';
 import { centersAt, MAX_PLANETS, BALL_R } from '../sim/hole.js';
+import { surfaceF, radiusAt } from '../sim/planet.js';
 
 const C = new Float64Array(MAX_PLANETS * 3);
 const Y = new THREE.Vector3(0, 1, 0);
@@ -15,7 +16,7 @@ const q1 = new THREE.Quaternion();
 export const LOFT = 0.62;
 export const LOFT_MIN = -0.05;
 export const LOFT_MAX = 1.15;
-const SHOULDER = 1.5; // while aiming the camera stands a little to the right, so the preview's arc shows its height
+const SHOULDER = 1.8; // while aiming the camera stands a little to the right, so the preview's arc shows its height
 
 export class ChaseCamera {
   constructor(camera) {
@@ -95,7 +96,10 @@ export class ChaseCamera {
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 >= rr * rr) continue;
       const d = Math.sqrt(d2) || 1;
-      p.set(c[i * 3] + (dx / d) * rr, c[i * 3 + 1] + (dy / d) * rr, c[i * 3 + 2] + (dz / d) * rr);
+      // Inside the bound, but is it inside the ground? Out to just above the real surface along the radial.
+      const r = pl.lobes.length ? radiusAt(pl, dx / d, dy / d, dz / d) + 0.8 : rr;
+      if (d >= r) continue;
+      p.set(c[i * 3] + (dx / d) * r, c[i * 3 + 1] + (dy / d) * r, c[i * 3 + 2] + (dz / d) * r);
     }
   }
 
@@ -161,7 +165,10 @@ export class ChaseCamera {
     const se = Math.sin(this.loft);
     this.aim.set(-Math.sin(wantYaw) * ce, se, -Math.cos(wantYaw) * ce).applyQuaternion(this.frame).normalize();
     this.right.set(Math.cos(wantYaw), 0, -Math.sin(wantYaw)).applyQuaternion(this.frame);
-    this.shoulder += ((this.aiming ? SHOULDER : 0) - this.shoulder) * (1 - Math.pow(0.001, dt / 0.6));
+    // The shoulder offset is a share of the half-width seen at the ball, so a narrow phone screen keeps the ball in view.
+    const hfov = 2 * Math.atan(Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect);
+    const wantShoulder = this.aiming ? Math.min(SHOULDER, this.dist * Math.tan(hfov / 2) * 0.2) : 0;
+    this.shoulder += (wantShoulder - this.shoulder) * (1 - Math.pow(0.001, dt / 0.6));
     const want = v2.copy(this.target).addScaledVector(v1, this.dist);
     // Keep out of worlds: shorten the boom if a planet is in the way or the camera is inside one.
     let dist = this.dist;
@@ -178,11 +185,24 @@ export class ChaseCamera {
       const disc = b * b - cc;
       if (disc <= 0) continue;
       const s = -b - Math.sqrt(disc);
-      if (s > 0 && s < dist) dist = Math.max(1.2, s - 0.4);
-      else if (cc < 0) {
-        // The ball itself is inside the sphere's bound (a crater, a hill): push the camera along the normal instead.
-        const s2 = -b + Math.sqrt(disc);
-        if (s2 > 0 && s2 < dist) dist = Math.min(dist, Math.max(1.2, s2 + 0.2));
+      if (cc >= 0) {
+        if (s > 0 && s < dist) dist = Math.max(1.2, s - 0.4);
+      } else {
+        // The ball is within this world's bound (its own world, down among the hills): only real ground between the
+        // ball and the camera shortens the boom, so a ball in a valley keeps its normal view.
+        const cx = c[i * 3];
+        const cy = c[i * 3 + 1];
+        const cz = c[i * 3 + 2];
+        for (let k = 1; k <= 10; k++) {
+          const d = (dist * k) / 10;
+          const px = this.target.x + v1.x * d;
+          const py = this.target.y + v1.y * d;
+          const pz = this.target.z + v1.z * d;
+          if (surfaceF(pl, px, py, pz, cx, cy, cz) < 0.5) {
+            dist = Math.max(1.2, (dist * (k - 1)) / 10);
+            break;
+          }
+        }
       }
     }
     want.copy(this.target).addScaledVector(v1, dist).addScaledVector(this.right, this.shoulder * Math.min(1, dist / 6));

@@ -28,9 +28,9 @@ const FORCED = (() => {
 // detail/small: icosphere subdivisions for big and small worlds; shading: 0 flat bands, 1 one layer of surface
 // detail, 2 all of it; sky: the baked sky's cube face size.
 export const QUALITY = {
-  low: { detail: 10, small: 7, shading: 0, stars: 900, sparkles: 0, particles: 60, trail: 36, maxRatio: 1.25, dust: 0, sky: 256, outline: 1.4, speedLines: 0 },
-  medium: { detail: 20, small: 13, shading: 1, stars: 1800, sparkles: 14, particles: 200, trail: 48, maxRatio: 1.75, dust: 180, sky: 512, outline: 1.5, speedLines: 8 },
-  high: { detail: 30, small: 20, shading: 2, stars: 2800, sparkles: 26, particles: 400, trail: 64, maxRatio: 2, dust: 420, sky: 1024, outline: 1.6, speedLines: 12 },
+  low: { detail: 10, small: 7, shading: 0, stars: 900, sparkles: 0, particles: 60, trail: 36, maxRatio: 1.25, dust: 0, sky: 128, outline: 1.4, speedLines: 0 },
+  medium: { detail: 20, small: 13, shading: 1, stars: 1800, sparkles: 14, particles: 200, trail: 48, maxRatio: 1.75, dust: 180, sky: 256, outline: 1.5, speedLines: 8 },
+  high: { detail: 30, small: 20, shading: 2, stars: 2800, sparkles: 26, particles: 400, trail: 64, maxRatio: 2, dust: 420, sky: 512, outline: 1.6, speedLines: 12 },
 };
 
 export class Gfx {
@@ -108,7 +108,8 @@ export class Gfx {
     if ((FORCED ?? settings.choice) !== 'auto') return;
     this.frameMs += (dtMs - this.frameMs) * 0.05;
     if (this.frameMs > 30) {
-      if (++this.slowFrames > 90 && this.autoLevel > 0) {
+      // A slow device steps down within about a second of slow frames; it steps back up only after 20 calm seconds.
+      if (++this.slowFrames > 45 && this.autoLevel > 0) {
         this.autoLevel--;
         this.slowFrames = 0;
         this.fastFrames = 0;

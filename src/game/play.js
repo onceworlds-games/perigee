@@ -319,6 +319,12 @@ export class Play {
         targetEntry = e;
       }
     }
+    // The fly-in follows the hole clock, not frames: a slow device (or a reload) is never left in it once play starts.
+    if (this.camera.mode === 'intro' && this.camera.intro) {
+      const since = (now - g.t0) / 1000;
+      if (st !== 'intro' && st !== 'wait') this.camera.endIntro();
+      else this.camera.intro.t = Math.max(this.camera.intro.t, since);
+    }
     if (targetBall) {
       ballPos(hole, targetBall, P);
       const flying = targetBall.mode === FLY || targetBall.mode === ROLL || targetBall.mode === LOST;

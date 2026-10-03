@@ -95,7 +95,9 @@ export class Input {
     this.drag.x = e.clientX;
     this.drag.y = e.clientY;
     this.drag.moved += Math.abs(dx) + Math.abs(dy);
-    this.emit('orbit', dx * this.dragSpeed, dy * this.dragSpeed);
+    // A finger is coarser than a mouse: it turns the aim a little less per pixel.
+    const k = this.drag.type === 'touch' ? this.dragSpeed * 0.7 : this.dragSpeed;
+    this.emit('orbit', dx * k, dy * k);
   }
 
   onUp(e) {
