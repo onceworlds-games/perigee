@@ -188,9 +188,9 @@ export const SKY_FRAG = /* glsl */ `
     float n2 = fbm(d * 3.1 - 5.0);
     float n3 = fbm(d * 1.6 + 29.0);
     vec3 col = uBase;
-    col = mix(col, uA, smoothstep(0.52, 0.72, n1) * 0.55);
-    col = mix(col, uB, smoothstep(0.55, 0.78, n2) * 0.5);
-    col = mix(col, uC, smoothstep(0.58, 0.8, n3) * 0.35);
+    col = mix(col, uA, smoothstep(0.48, 0.72, n1) * 0.8);
+    col = mix(col, uB, smoothstep(0.52, 0.78, n2) * 0.7);
+    col = mix(col, uC, smoothstep(0.55, 0.8, n3) * 0.5);
     // A faint band of dust across the sky.
     float band = exp(-pow((d.y + 0.15) * 3.0, 2.0)) * 0.08;
     col += vec3(band);

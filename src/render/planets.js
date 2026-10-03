@@ -108,7 +108,7 @@ export class PlanetView {
     this.pl = pl;
     this.group = new THREE.Group();
     const k = kindColours(pl.kind);
-    const detail = pl.R < 3 ? Math.max(2, tier.detail - 2) : pl.R < 6 ? Math.max(2, tier.detail - 1) : tier.detail;
+    const detail = pl.R < 3 ? Math.max(2, tier.detail - 2) : pl.R < 6 ? Math.max(3, tier.detail - 1) : tier.detail;
     const geo = planetGeometry(pl, detail, seed + pl.i * 31);
     this.material = toonMaterial(k, pl.gas ? GAS_FRAG : TOON_FRAG);
     if (pl.gas) {

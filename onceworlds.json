@@ -1,8 +1,38 @@
 {
   "slug": "perigee",
   "name": "Perigee",
-  "description": "Golf on tiny planets. Bend shots around moons and race your friends to the cup.",
+  "description": "Golf on tiny worlds: curve shots round moons and race everyone to the cup at once.",
   "dir": "dist",
   "productionBranch": "main",
-  "genre": "Sports"
+  "genre": "Sports",
+  "icon": "store/icon.png",
+  "thumbnails": ["store/thumb-1.png", "store/thumb-2.png", "store/thumb-3.png", "store/thumb-4.png"],
+  "badges": [
+    { "id": "first-cup", "name": "First Cup", "description": "Sink your first ball.", "icon": "store/badges/first-cup.png" },
+    { "id": "slingshot", "name": "Slingshot", "description": "Sink a ball after swinging within 10 m of another world.", "icon": "store/badges/slingshot.png" },
+    { "id": "perigee", "name": "Perigee", "description": "A hole in one.", "icon": "store/badges/perigee.png" },
+    { "id": "aerobrake", "name": "Aerobrake", "description": "Skim an atmosphere and land it.", "icon": "store/badges/aerobrake.png" },
+    { "id": "lost-in-space", "name": "Lost In Space", "description": "Send a ball out of bounds.", "icon": "store/badges/lost-in-space.png" },
+    { "id": "photo-finish", "name": "Photo Finish", "description": "Sink in the last two seconds of a hole.", "icon": "store/badges/photo-finish.png" },
+    { "id": "under-par", "name": "Under Par", "description": "Finish a nine-hole round under par.", "icon": "store/badges/under-par.png" },
+    { "id": "daily-streak-7", "name": "Seven Days", "description": "Play the daily hole seven days running.", "icon": "store/badges/daily-streak-7.png" },
+    { "id": "wild-card", "name": "Wild Card", "description": "Win a round with Cards on.", "icon": "store/badges/wild-card.png" },
+    { "id": "full-course", "name": "Full Course", "description": "Play a hole in all eight worlds.", "icon": "store/badges/full-course.png" },
+    { "id": "level-10", "name": "Level 10", "description": "Reach level 10.", "icon": "store/badges/level-10.png" }
+  ],
+  "controls": [
+    { "keys": ["Drag"], "action": "Look around (aim through the camera)" },
+    { "keys": ["Space"], "action": "Hold to charge, release to shoot" },
+    { "keys": ["Esc"], "action": "Cancel the shot" },
+    { "keys": ["R"], "action": "Look at the cup" },
+    { "keys": ["Wheel"], "action": "Zoom" },
+    { "keys": ["1", "2", "3"], "action": "Play a card" },
+    { "keys": ["Q"], "action": "Thruster or brake mid-flight" },
+    { "keys": ["F"], "action": "Preview length (solo)" },
+    { "keys": ["X"], "action": "Pick up (twice)" },
+    { "keys": ["P"], "action": "Replay your last shot" },
+    { "keys": ["C"], "action": "Watch the next player" },
+    { "keys": ["Enter"], "action": "Next" }
+  ],
+  "help": "Every hole is a small solar system. Aim with the camera, hold Shoot to charge and let go: the ball curves with gravity, bounces, rolls and drops into the cup. Everyone shoots at once; lowest strokes wins. Alone, play bots, the daily hole, practice or the tour."
 }

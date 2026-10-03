@@ -14,8 +14,8 @@ export const PALETTE = {
 };
 
 export const QUALITY = {
-  low: { detail: 3, stars: 900, particles: 60, trail: 24, maxRatio: 1.25, dust: 0 },
-  medium: { detail: 4, stars: 1800, particles: 200, trail: 40, maxRatio: 2, dust: 150 },
+  low: { detail: 4, stars: 900, particles: 60, trail: 24, maxRatio: 1.25, dust: 0 },
+  medium: { detail: 5, stars: 1800, particles: 200, trail: 40, maxRatio: 2, dust: 150 },
   high: { detail: 5, stars: 3000, particles: 400, trail: 64, maxRatio: 2, dust: 400 },
 };
 

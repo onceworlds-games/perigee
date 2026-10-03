@@ -105,6 +105,14 @@ export const WORLDS = [
 
 export const WORLD_IDS = WORLDS.map((w) => w.id);
 
+/** The lobby's World setting (at most eight choices): Auto, Random and four sibling pairs that alternate. */
+export const WORLD_PAIRS = {
+  'pebble-binary': ['pebble', 'binary'],
+  'lava-ice': ['lava', 'ice'],
+  'clockwork-wormhole': ['clockwork', 'wormhole'],
+  'casino-comet': ['casino', 'comet'],
+};
+
 export function worldById(id) {
   return WORLDS.find((w) => w.id === id) ?? WORLDS[0];
 }

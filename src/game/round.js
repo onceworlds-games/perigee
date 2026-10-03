@@ -10,7 +10,7 @@ import { generateHoleSteps } from '../sim/gen.js';
 import { planShotSteps, thinkTime, botIdentity } from '../sim/bots.js';
 import { strokeCap, standings } from '../sim/score.js';
 import { draftFor, cleanMods, modsFor, CARD_IDS, HAND_MAX } from '../sim/cards.js';
-import { autoWorld, WORLD_IDS } from '../sim/worlds.js';
+import { autoWorld, WORLD_IDS, WORLD_PAIRS } from '../sim/worlds.js';
 import { makeRng, seedOf } from '../sim/rng.js';
 import { G_KEY, shotKey } from './table.js';
 
@@ -51,7 +51,8 @@ export function pickHoles(kind, settings, seed, extra = {}) {
   for (let i = 0; i < n; i++) {
     if (world === 'random') out.push({ src: 'gen', world: autoWorld(seed, i, n), seed: seedOf('random', seed, i) });
     else {
-      const w = world && world !== 'auto' && WORLD_IDS.includes(world) ? world : autoWorld(seed, i, n);
+      const pair = WORLD_PAIRS[world];
+      const w = pair ? pair[i % 2] : world && world !== 'auto' && WORLD_IDS.includes(world) ? world : autoWorld(seed, i, n);
       // Easy first: the first hole of a round is from the friendly end of its world.
       const idx = i === 0 ? 1 + rng.int(3) : 1 + rng.int(9);
       out.push({ src: 'lib', id: `${w}-${idx}` });
