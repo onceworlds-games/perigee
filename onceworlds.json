@@ -33,6 +33,5 @@
     { "keys": ["P"], "action": "Replay your last shot" },
     { "keys": ["C"], "action": "Watch the next player" },
     { "keys": ["Wheel", "-", "="], "action": "Zoom" }
-  ],
-  "help": "Every hole is a small solar system. Look where you want to go (tilt up to loft, down to putt), hold Shoot to charge and let go: the ball curves round the worlds, bounces, rolls and drops into the cup. Everyone shoots at once; lowest strokes wins. Alone, play the bots, the daily hole, practice or the tour."
+  ]
 }
