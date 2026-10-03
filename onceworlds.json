@@ -1,0 +1,8 @@
+{
+  "slug": "perigee",
+  "name": "Perigee",
+  "description": "Golf on tiny planets. Bend shots around moons and race your friends to the cup.",
+  "dir": "dist",
+  "productionBranch": "main",
+  "genre": "Sports"
+}
