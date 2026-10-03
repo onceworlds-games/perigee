@@ -240,8 +240,9 @@ export class Play {
     if (st !== 'aim' && st !== 'flying' && st !== 'settling') return;
     const now = Date.now();
     if (now - this.pickupArmed > 2500) {
+      // Asked once: the button turns into "Sure?" for a moment (X again on a keyboard).
       this.pickupArmed = now;
-      this.screens.toast('Pick up? Again to confirm', 'ice', 2400);
+      this.screens.toast('Pick up?', 'ice', 2400);
       return;
     }
     this.pickupArmed = 0;
@@ -461,7 +462,8 @@ export class Play {
 
   syncActions(st, g, touch) {
     const list = [];
-    if (st === 'aim' || st === 'flying' || st === 'settling') list.push({ id: 'pickup', label: 'Pick up', key: 'X', onClick: () => this.pickUp() });
+    const armed = Date.now() - this.pickupArmed < 2500;
+    if (st === 'aim' || st === 'flying' || st === 'settling') list.push({ id: armed ? 'sure' : 'pickup', label: armed ? 'Sure?' : 'Pick up', key: 'X', cls: armed ? 'coral' : 'ghost', onClick: () => this.pickUp() });
     if ((st === 'holed' || st === 'up' || st === 'aim') && this.session.lastShotRec && !this.session.replay) list.push({ id: 'replay', label: 'Replay', key: 'P', onClick: () => this.session.startReplay() });
     if (this.kind === 'practice' && st !== 'watch') list.push({ id: 'next', label: 'Next hole', key: 'N', cls: 'teal', onClick: () => this.onNext?.() });
     if (this.kind !== 'match') list.push({ id: 'quit', label: 'Quit', key: 'Esc', onClick: () => this.onQuit?.() });

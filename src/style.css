@@ -1385,7 +1385,15 @@ table.board img {
     max-width: 40vw;
   }
   /* A phone shows the leaders and you. */
-  .side .line:nth-child(n + 4):not(.me) {
+  .side .line:nth-child(n + 3):not(.me) {
     display: none;
   }
+  .hint {
+    top: calc(var(--sat) + 150px);
+    font-size: 17px;
+  }
+}
+.btn.coral {
+  background: var(--coral);
+  box-shadow: 0 6px 0 #9c3a30, 0 10px 24px rgba(0, 0, 0, 0.35);
 }

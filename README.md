@@ -54,10 +54,12 @@ Thruster, Magnet, Brake, Ghost, Bouncy, Sticky, Long Look, Mulligan, Heavy and L
 
 ## Multiplayer
 
-A public game on Onceworlds: the platform's lobby, settings and match cycle. The host's page runs the rules and
-writes one round record to room state; every shot is a small record other pages simulate with the same
+A public game on Onceworlds: the platform's match cycle and Ready strip under the game's own clubhouse (the host
+sets the course there). The host's page runs the rules and writes one round record to room state; every shot is a small record other pages simulate with the same
 deterministic physics, so nothing about the course or the flights is streamed. A reload, a dropped connection or a
-new host carries on from the room state; latecomers watch and join at the next hole.
+new host carries on from the room state; latecomers watch and join at the next hole. A hand of cards is a private
+value (only its player and the host can read it); since a player can write their own, the host honours only cards
+the drafts actually offered them, and every page checks shot and rest records before it simulates them.
 
 ## How it's built
 
