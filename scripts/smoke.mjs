@@ -36,6 +36,37 @@ async function session(width, height, mobile, name, secs) {
   b.close();
 }
 await session(1100, 760, false, 'desktop', seconds);
+// Determinism between Node and the browser build: the same reference shots end in the same place.
+{
+  const { prepareHole } = await import('../src/sim/hole.js');
+  const { makeBall, launchAt, runToRest, ballPos } = await import('../src/sim/ball.js');
+  const lib = JSON.parse((await import('node:fs')).readFileSync(new URL('../data/holes.json', import.meta.url), 'utf8'));
+  const b = await launch({ width: 400, height: 300 });
+  await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?test=1` });
+  for (let i = 0; i < 100; i++) {
+    await sleep(100);
+    if ((await b.evaluate('typeof window.__perigee?.hash')) === 'function') break;
+  }
+  let same = 0;
+  const ids = lib.holes.filter((h, i) => i % 6 === 0).map((h) => h.id);
+  for (const id of ids) {
+    const data = lib.holes.find((h) => h.id === id);
+    const h = prepareHole(data);
+    const ball = makeBall(h, h.tee.p, [h.tee.dx, h.tee.dy, h.tee.dz]);
+    ball.quiet = true;
+    launchAt(h, ball, data.ref.t0, data.ref.p[0], data.ref.p[1], data.ref.p[2], data.ref.v[0], data.ref.v[1], data.ref.v[2], null);
+    const mode = runToRest(h, ball, 120 * 40);
+    const node = { mode, step: ball.step, p: ballPos(h, ball, [0, 0, 0]) };
+    const web = await b.evaluate(`JSON.stringify(window.__perigee.hash(${JSON.stringify(id)}))`);
+    const w = JSON.parse(web);
+    const ok = w.mode === node.mode && w.step === node.step && w.p.every((v, k) => v === node.p[k]);
+    if (ok) same++;
+    else console.log(`  determinism MISMATCH ${id}: node ${JSON.stringify(node)} web ${web}`);
+  }
+  console.log(`determinism node vs browser: ${same}/${ids.length} identical`);
+  if (same !== ids.length) errors.push('determinism mismatch');
+  b.close();
+}
 await session(390, 844, true, 'phone', Math.min(seconds, 25));
 server.close();
 console.log(`errors: ${errors.length}`);

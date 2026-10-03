@@ -1,7 +1,7 @@
 // Plays a whole hole with a bot, headless: plan, shoot, simulate, repeat until it drops or the stroke cap. Used by
 // the balance harness and the tests (the live game is event-driven and uses the same pieces one shot at a time).
 import { makeRng, seedOf } from './rng.js';
-import { makeBall, launchAt, simulate, HOLED, REST, DT } from './ball.js';
+import { makeBall, launchAt, simulate, distToCup, HOLED, REST, DT } from './ball.js';
 import { planShot, thinkTime } from './bots.js';
 import { strokeCap } from './score.js';
 import { modsFor } from './cards.js';
@@ -22,6 +22,7 @@ export function playHole(hole, tier, seed, opts = {}) {
   let holed = false;
   const log = [];
   let cardLeft = opts.card ?? null;
+  let retries = 0;
   while (!holed && shots + b.penalties < cap) {
     t += thinkTime(tier, rng);
     let mods = null;
@@ -36,7 +37,16 @@ export function playHole(hole, tier, seed, opts = {}) {
       cardLeft = null;
     }
     const before = { g: b.rest.g, dx: b.rest.dx, dy: b.rest.dy, dz: b.rest.dz };
-    const plan = planShot(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots), mods);
+    let plan = planShot(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), mods);
+    if (mods) {
+      // A player looks at the preview with and without the card and keeps it for a better moment if it doesn't help.
+      const plain = planShot(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), null);
+      if (plain.score >= plan.score) {
+        plan = plain;
+        mods = null;
+        cardLeft = opts.card;
+      }
+    }
     launchAt(hole, b, t, plan.p[0], plan.p[1], plan.p[2], plan.v[0], plan.v[1], plan.v[2], mods);
     shots++;
     const n = simulate(hole, b, HOLE_CAP_STEPS);
@@ -47,12 +57,13 @@ export function playHole(hole, tier, seed, opts = {}) {
       break;
     }
     if (useMulligan && !holed) {
-      // Mulligan: if the shot went badly (lost, or no closer), take it back and shoot again from the same spot.
-      const bad = b.penalties > 0 || b.rest.g !== hole.cup.p;
+      // Mulligan: if the shot went badly (lost, the wrong world, or still far from the cup), take it back.
+      const bad = b.penalties > 0 || b.rest.g !== hole.cup.p || distToCup(hole, b) > 5;
       if (bad) {
         b.mode = REST;
         b.penalties = 0;
         shots--;
+        retries++;
         const back = makeBall(hole, before.g, [before.dx, before.dy, before.dz]);
         Object.assign(b, { rest: back.rest, rx: back.rx, ry: back.ry, rz: back.rz, g: back.g, vx: 0, vy: 0, vz: 0, mode: REST });
       }

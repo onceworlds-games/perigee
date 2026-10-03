@@ -42,10 +42,11 @@ export const TOON_FRAG = /* glsl */ `
     vec3 n = normalize(vN);
     vec3 v = normalize(cameraPosition - vW);
     float d = dot(n, normalize(uLight));
-    float band = d > 0.45 ? 1.0 : (d > -0.05 ? 0.72 : 0.5);
+    // Three bands: a warm lit face, a mid tone and a cool shadow, like a printed poster.
+    vec3 band = d > 0.42 ? vec3(1.18, 1.12, 1.0) : (d > -0.08 ? vec3(0.86, 0.86, 0.84) : vec3(0.5, 0.56, 0.62));
     float rim = pow(1.0 - max(dot(n, v), 0.0), 3.0);
     vec3 col = vC * band;
-    col += uRim * rim * 0.35;
+    col += uRim * rim * 0.45;
     if (uGloss > 0.0) {
       vec3 h = normalize(normalize(uLight) + v);
       float s = pow(max(dot(n, h), 0.0), 40.0);
@@ -115,7 +116,7 @@ export const GAS_FRAG = /* glsl */ `
     vec3 n = normalize(vN);
     vec3 v = normalize(cameraPosition - vW);
     float d = dot(n, normalize(uLight));
-    float band = d > 0.4 ? 1.0 : (d > -0.1 ? 0.75 : 0.55);
+    float band = d > 0.4 ? 1.15 : (d > -0.1 ? 0.82 : 0.55);
     float lat = vH * 7.0 + sin(vH * 23.0 + uTime * 0.2) * 0.3;
     float s = step(0.5, fract(lat));
     vec3 base = mix(vC, uColor2, s);
@@ -141,7 +142,7 @@ export const BALL_FRAG = /* glsl */ `
     vec3 n = normalize(vN);
     vec3 v = normalize(cameraPosition - vW);
     float d = dot(n, normalize(uLight));
-    float band = d > 0.4 ? 1.0 : (d > -0.1 ? 0.78 : 0.58);
+    float band = d > 0.4 ? 1.12 : (d > -0.1 ? 0.82 : 0.58);
     float stripe = smoothstep(0.12, 0.09, abs(vH)) ;
     vec3 col = mix(vC, uStripe, stripe) * band;
     float rim = pow(1.0 - max(dot(n, v), 0.0), 3.0);
@@ -184,13 +185,13 @@ export const SKY_FRAG = /* glsl */ `
   }
   void main() {
     vec3 d = vD;
-    float n1 = fbm(d * 2.2 + 11.0);
-    float n2 = fbm(d * 3.1 - 5.0);
-    float n3 = fbm(d * 1.6 + 29.0);
+    float n1 = fbm(d * 1.5 + 11.0);
+    float n2 = fbm(d * 2.1 - 5.0);
+    float n3 = fbm(d * 1.2 + 29.0);
     vec3 col = uBase;
-    col = mix(col, uA, smoothstep(0.48, 0.72, n1) * 0.8);
-    col = mix(col, uB, smoothstep(0.52, 0.78, n2) * 0.7);
-    col = mix(col, uC, smoothstep(0.55, 0.8, n3) * 0.5);
+    col = mix(col, uA, smoothstep(0.42, 0.7, n1) * 0.95);
+    col = mix(col, uB, smoothstep(0.47, 0.74, n2) * 0.85);
+    col = mix(col, uC, smoothstep(0.5, 0.76, n3) * 0.7);
     // A faint band of dust across the sky.
     float band = exp(-pow((d.y + 0.15) * 3.0, 2.0)) * 0.08;
     col += vec3(band);
@@ -231,7 +232,7 @@ export const DOT_VERT = /* glsl */ `
   void main() {
     vF = fade;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = (14.0 * fade + 4.0) * (120.0 / max(-mv.z, 1.0));
+    gl_PointSize = min(16.0, (3.5 * fade + 1.5) * (60.0 / max(-mv.z, 1.0)));
     gl_Position = projectionMatrix * mv;
   }
 `;

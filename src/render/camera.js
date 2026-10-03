@@ -67,9 +67,25 @@ export class ChaseCamera {
     this.pitch = 0.3;
   }
 
-  startIntro(from, to, up) {
+  startIntro(from, to, up, cupUp = up) {
     this.mode = 'intro';
-    this.intro = { from: new THREE.Vector3().fromArray(from), to: new THREE.Vector3().fromArray(to), up: new THREE.Vector3().fromArray(up), t: 0, len: this.reduced ? 0.01 : 4.2 };
+    this.intro = { from: new THREE.Vector3().fromArray(from), to: new THREE.Vector3().fromArray(to), up: new THREE.Vector3().fromArray(up), cupUp: new THREE.Vector3().fromArray(cupUp), t: 0, len: this.reduced ? 0.01 : 4.2 };
+  }
+
+  /** Pushes a point out of every world it is inside (the camera is never in a planet). */
+  keepOut(hole, t, p) {
+    const c = centersAt(hole, t, C);
+    for (let i = 0; i < hole.n; i++) {
+      const pl = hole.planets[i];
+      const rr = pl.R * (1 + pl.hmax) + 0.8;
+      const dx = p.x - c[i * 3];
+      const dy = p.y - c[i * 3 + 1];
+      const dz = p.z - c[i * 3 + 2];
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= rr * rr) continue;
+      const d = Math.sqrt(d2) || 1;
+      p.set(c[i * 3] + (dx / d) * rr, c[i * 3 + 1] + (dy / d) * rr, c[i * 3 + 2] + (dz / d) * rr);
+    }
   }
 
   endIntro() {
@@ -93,11 +109,13 @@ export class ChaseCamera {
       it.t += dt;
       const s = Math.min(1, it.t / it.len);
       const e = s * s * (3 - 2 * s);
-      // Fly an arc from above the cup to behind the tee, looking ahead along the way.
-      v1.copy(it.from).addScaledVector(it.up, 6);
+      // Fly a high arc from above the cup to behind the tee, looking ahead along the way; never through a world.
+      v1.copy(it.from).addScaledVector(it.cupUp, 7);
       v2.copy(it.to).addScaledVector(it.up, 5).addScaledVector(this.aim, -8);
       this.pos.lerpVectors(v1, v2, e);
-      this.pos.addScaledVector(it.up, Math.sin(s * Math.PI) * 10);
+      const lift = Math.sin(s * Math.PI);
+      this.pos.addScaledVector(it.up, lift * 14).addScaledVector(it.cupUp, lift * 10);
+      this.keepOut(hole, t, this.pos);
       this.look.lerpVectors(it.from, it.to, Math.min(1, e * 1.2));
       this.camera.position.copy(this.pos);
       this.camera.up.copy(it.up);
@@ -153,6 +171,7 @@ export class ChaseCamera {
     want.copy(this.target).addScaledVector(v1, dist);
     const k = flying ? 1 - Math.pow(0.001, dt / 0.35) : 1 - Math.pow(0.001, dt / 0.12);
     this.pos.lerp(want, k);
+    this.keepOut(hole, t, this.pos);
     // Shake (never with reduced motion).
     let sx = 0;
     let sy = 0;

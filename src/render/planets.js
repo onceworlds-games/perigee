@@ -74,7 +74,7 @@ export function planetGeometry(pl, detail, seed = 1) {
     pos.setXYZ(i, dx * r, dy * r, dz * r);
     heights[i] = pl.gas ? dy : h;
     // Colour by height: valleys dark, crests light, with a little speckle so flat faces are not flat colour.
-    const t = Math.max(0, Math.min(1, (h + 0.1) / 0.28));
+    const t = Math.max(0, Math.min(1, (h + 0.07) / 0.2));
     c.copy(low).lerp(base, Math.min(1, t * 2)).lerp(high, Math.max(0, t * 2 - 1));
     const speck = (rng.next() - 0.5) * 0.06;
     c.r += speck;

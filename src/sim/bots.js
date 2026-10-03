@@ -8,7 +8,7 @@ import { centersAt, q, MAX_PLANETS } from './hole.js';
 // n: candidates; ang/pow: aim and power noise (tan of the angle, fraction); horizon: how far ahead a candidate is
 // judged (seconds); check: how many of the best candidates are flown to the end before choosing.
 export const TIERS = {
-  rookie: { name: 'Rookie', n: 50, ang: 0.09, pow: 0.1, think: [3, 6], explore: 0.5, horizon: 2.5, check: 0 },
+  rookie: { name: 'Rookie', n: 50, ang: 0.08, pow: 0.09, think: [3, 6], explore: 0.5, horizon: 2.5, check: 0 },
   club: { name: 'Club', n: 100, ang: 0.06, pow: 0.07, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
   pro: { name: 'Pro', n: 220, ang: 0.05, pow: 0.06, think: [2, 4], explore: 0.35, horizon: 6, check: 3 },
   legend: { name: 'Legend', n: 300, ang: 0.036, pow: 0.045, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
@@ -30,8 +30,10 @@ function cross(a, b) {
 
 /** The bot's name for seat k of a match (names cycle, tiers mix). */
 export function botIdentity(seed, k) {
-  const rng = makeRng((seed ^ 0x2545f491) + k * 7919);
-  return { name: BOT_NAMES[(rng.int(BOT_NAMES.length) + k) % BOT_NAMES.length], tier: TIER_IDS[Math.min(3, rng.int(4))] };
+  const rng = makeRng(seed ^ 0x2545f491);
+  const names = rng.shuffle(BOT_NAMES.slice());
+  const tiers = rng.shuffle(TIER_IDS.slice());
+  return { name: names[k % names.length], tier: tiers[k % tiers.length] };
 }
 
 /**
@@ -115,6 +117,7 @@ export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
   // The careful tiers fly their best few candidates to the very end before choosing (a shot that only goes
   // wrong after the horizon is caught here).
   let best = top[0];
+  let bestScore = best.score;
   if (T.check > 0) {
     let bestFull = -1e9;
     for (const cand of top) {
@@ -132,6 +135,7 @@ export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
       if (score > bestFull) {
         bestFull = score;
         best = cand;
+        bestScore = score;
       }
       yield 1;
     }
@@ -142,7 +146,7 @@ export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
   const dir = unit([best.dir[0] + perp[0] * a, best.dir[1] + perp[1] * a, best.dir[2] + perp[2] * a]);
   const speed = Math.max(1.5, Math.min(38, best.speed * (1 + T.pow * (rng.next() * 2 - 1))));
   const v = [q(dir[0] * speed + vp[0]), q(dir[1] * speed + vp[1]), q(dir[2] * speed + vp[2])];
-  return { dir, speed, score: best.score, p: [q(from[0]), q(from[1]), q(from[2])], v };
+  return { dir, speed, score: bestScore, p: [q(from[0]), q(from[1]), q(from[2])], v };
 }
 
 export function planShot(hole, ball, t0, tier, seed, mods) {

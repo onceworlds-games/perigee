@@ -19,7 +19,7 @@ import { standings, resultWord, parTotal } from '../sim/score.js';
 import { WORLDS, worldById, WORLD_IDS } from '../sim/worlds.js';
 import { seedOf } from '../sim/rng.js';
 import { planShot } from '../sim/bots.js';
-import { MAX_SPEED } from '../sim/ball.js';
+import { MAX_SPEED, makeBall, launchAt, runToRest, ballPos } from '../sim/ball.js';
 import { prepareHole, teePos } from '../sim/hole.js';
 import library from '../../data/holes.json';
 
@@ -90,6 +90,13 @@ export class App {
     });
     this.camera.reduced = settings.reducedMotion;
     if (settings.reducedMotion) document.body.classList.add('reduced');
+    // Any gesture inside the game may wake a suspended audio context; Esc backs out of the clubhouse screens.
+    this.input.on('press', () => this.audio.resume());
+    this.input.on('keydown', (k) => {
+      this.audio.resume();
+      if (k === 'Escape' && this.mode === 'club' && this.screens.name !== 'club') this.club();
+      if (k === 'Enter' && this.mode === 'title') this.screens.current?.querySelector('button')?.click();
+    });
   }
 
   resize() {
@@ -199,6 +206,7 @@ export class App {
 
   hostStart() {
     const room = this.room;
+    this.startedFor = room.match.id;
     const participants = room.match.participants.slice();
     const fill = room.settings.fill;
     const want = fill === '8' ? 8 : fill === '4' ? 4 : 0;
@@ -271,6 +279,7 @@ export class App {
       return Array.isArray(h) ? h.slice(0, HAND_MAX) : [];
     };
     this.play.onPickUp = () => this.pickUp();
+    this.play.onMulligan = () => this.mulligan();
     this.play.onMyHole = (info) => this.myHole(info);
     this.play.onQuit = () => this.endSolo(false);
     this.play.onNext = () => this.nextPractice();
@@ -409,10 +418,24 @@ export class App {
     if (this.round && this.roundCtx.isAuthority()) {
       const hole = this.round.hole(g.h);
       const cap = hole ? hole.par + 4 : 7;
-      this.round.write({ cur: { ...this.round.g().cur, [me]: { ...cur, n: cap, up: true, rest: null } } });
+      this.round.write({ cur: { ...this.round.g().cur, [me]: { ...cur, n: cap, up: true } } });
       this.round.balls.delete(me);
     } else safe(() => this.room.send({ t: 'pickup', h: g.h }, { to: this.room.host }));
     this.screens.toast('Picked up', 'ice', 1500);
+  }
+
+  /** Take the last shot back (the Mulligan card): the authority does it, or is asked to. */
+  mulligan() {
+    const g = this.session?.g;
+    if (!g || g.phase !== 'play') return;
+    const me = this.room.me.id;
+    if (this.round && this.roundCtx.isAuthority()) {
+      if (this.round.mulligan(me)) this.screens.toast('Shot taken back', 'ice', 1400);
+      else this.screens.toast('Nothing to take back', 'ice', 1200);
+    } else {
+      safe(() => this.room.send({ t: 'mull', h: g.h }, { to: this.room.host }));
+      this.screens.toast('Asking for it back', 'ice', 1200);
+    }
   }
 
   myHole({ strokes, par, ace, b, holeId, world, now, endsAt }) {
@@ -434,7 +457,7 @@ export class App {
       if (!cur || cur.holed || cur.up) return;
       const hole = this.round.hole(g.h);
       const cap = hole ? hole.par + 4 : 7;
-      this.round.write({ cur: { ...g.cur, [from.id]: { ...cur, n: cap, up: true, rest: null } } });
+      this.round.write({ cur: { ...g.cur, [from.id]: { ...cur, n: cap, up: true } } });
       this.round.balls.delete(from.id);
     } else if (data.t === 'mull' && data.h === g.h) this.round.mulligan(from.id);
   }
@@ -461,7 +484,10 @@ export class App {
       const now = ctx.clock();
       if (this.mode === 'match' && this.room.match.id !== ctx.mid && this.room.match.phase !== 'playing') return this.club();
       if (ctx.isAuthority()) {
-        this.round.adopt();
+        if (!this.round.adopt() && this.mode === 'match' && this.room.match.phase === 'playing' && this.startedFor !== ctx.mid) {
+          this.startedFor = ctx.mid;
+          this.hostStart();
+        }
         this.round.tick();
       }
       const g = this.round.g();
@@ -561,10 +587,12 @@ export class App {
           rows,
           room: this.room,
           title,
-          xpLine: `+${this.roundXp} XP · Level ${this.profile.level}`,
+          xpLine: g.kind === 'practice' ? '' : `+${this.roundXp} XP · Level ${this.profile.level}`,
           over: false,
+          doneLabel: g.kind === 'practice' ? 'Next hole' : 'Done',
           onDone: () => {
-            if (solo) this.endSolo(false);
+            if (g.kind === 'practice') this.nextPractice();
+            else if (solo) this.endSolo(false);
             else {
               this.play.okSent = 'final';
               this.setPresence({ scr: 'final', ok: 'final' });
@@ -619,6 +647,18 @@ export class App {
       if (!this.profile.data.tour.best || mine.strokes < this.profile.data.tour.best) this.profile.data.tour.best = mine.strokes;
       this.profile.save(true);
     }
+  }
+
+  /** Replays a library hole's reference shot and reports where it ended (the Node harness compares). */
+  hash(holeId) {
+    const data = library.holes.find((h) => h.id === holeId) ?? library.holes[0];
+    const h = prepareHole(data);
+    const b = makeBall(h, h.tee.p, [h.tee.dx, h.tee.dy, h.tee.dz]);
+    b.quiet = true;
+    launchAt(h, b, data.ref.t0, data.ref.p[0], data.ref.p[1], data.ref.p[2], data.ref.v[0], data.ref.v[1], data.ref.v[2], null);
+    const mode = runToRest(h, b, 120 * 40);
+    const p = ballPos(h, b, [0, 0, 0]);
+    return { id: data.id, mode, step: b.step, p, bounces: b.bounces, rolled: b.rolled };
   }
 
   /** ?test=auto: plays by itself so a headless browser can run the loop. */

@@ -581,3 +581,29 @@ table.board img {
   font-size: 15px;
   opacity: 0.9;
 }
+
+/* Narrow screens: the platform's buttons own the top-left 130x56 px, so the top bar moves right of them. */
+@media (max-width: 560px) {
+  .topbar {
+    left: calc(var(--sal) + 138px);
+    transform: none;
+    align-items: flex-start;
+    text-align: left;
+    max-width: calc(100vw - 150px - var(--sar));
+  }
+  .topbar .hole {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .topbar .par {
+    font-size: 12px;
+  }
+  .side {
+    top: calc(var(--sat) + 70px);
+    font-size: 12px;
+    max-width: 40vw;
+  }
+}

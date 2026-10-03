@@ -301,14 +301,14 @@ export class Screens {
     return s;
   }
 
-  final({ rows, room, onDone, title, xpLine, over }) {
+  final({ rows, room, onDone, title, xpLine, over, doneLabel = 'Done' }) {
     const s = $('div', 'screen lobby');
     s.append($('div', 'word coral', title));
     const card = $('div', 'card');
     card.append(this.resultsTable(rows, room));
     if (xpLine) card.append($('div', 'badgeline', xpLine));
     s.append(card);
-    if (!over) s.append(button('Done', 'teal', onDone, 'Enter'));
+    if (!over) s.append(button(doneLabel, 'teal', onDone, 'Enter'));
     this.show('final', s);
     return s;
   }

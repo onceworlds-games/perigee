@@ -19,9 +19,9 @@ export class Backdrop {
         depthWrite: false,
         uniforms: {
           uBase: { value: new THREE.Color(PALETTE.space) },
-          uA: { value: new THREE.Color(0x19524d) },
-          uB: { value: new THREE.Color(0x5a2e1a) },
-          uC: { value: new THREE.Color(0x4a2434) },
+          uA: { value: new THREE.Color(0x1f6f66) },
+          uB: { value: new THREE.Color(0x7a3d1c) },
+          uC: { value: new THREE.Color(0x6a2f44) },
           uSeed: { value: (seed % 1000) * 0.37 },
         },
       }),
@@ -71,8 +71,8 @@ export class Backdrop {
       this.stars.push(p);
       return p;
     };
-    layer(Math.floor(tier.stars * 0.7), 560, 2.2, PALETTE.cream);
-    layer(Math.floor(tier.stars * 0.3), 420, 1.6, PALETTE.ice);
+    layer(Math.floor(tier.stars * 0.7), 560, 2.8, PALETTE.cream);
+    layer(Math.floor(tier.stars * 0.3), 420, 2.0, PALETTE.ice);
     if (tier.dust > 0) {
       const d = layer(tier.dust, 1, 0.9, 0x9fb8a8);
       // Dust lives among the worlds (a slow drift), not on the far sphere.

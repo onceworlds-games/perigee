@@ -77,7 +77,7 @@ export class Round {
   constructor(ctx) {
     this.ctx = ctx;
     this.table = ctx.table;
-    this.gen = new Map(); // seed -> hole data (generated at runtime)
+    this.gen = new Map(); // seed -> hole data (built at runtime)
     this.genJobs = new Map(); // seed -> iterator
     this.holes = new Map(); // index -> prepared hole
     this.balls = new Map(); // pid -> { b, key, acts, done }
@@ -265,15 +265,27 @@ export class Round {
     const vp = planetVel(hole, rest.g, t);
     const rel = Math.hypot(v[0] - vp[0], v[1] - vp[1], v[2] - vp[2]);
     if (rel > MAX_SPEED + 0.5) return null;
-    let mods = cleanMods(s.mods, hole.n);
-    if (mods && !g.bots[pid]) {
-      // A card must come from the player's hand; the authority takes it out and shows it.
-      const card = typeof s.card === 'string' && CARD_IDS.includes(s.card) ? s.card : null;
+    // Mods ride on the shot; acts (a thruster tap, a brake hold) arrive later in the same record.
+    const merged = s.mods && typeof s.mods === 'object' ? { ...s.mods } : null;
+    if (merged && s.acts && typeof s.acts === 'object') {
+      if (Number.isInteger(s.acts.thrust)) merged.thrust = s.acts.thrust;
+      if (s.acts.brake && typeof s.acts.brake === 'object') merged.brake = { from: s.acts.brake.from, to: s.acts.brake.to };
+    }
+    let mods = cleanMods(merged, hole.n);
+    const card = typeof s.card === 'string' && CARD_IDS.includes(s.card) ? s.card : null;
+    if (!g.bots[pid] && (card || mods)) {
+      // A card must come from the player's hand; the authority takes it out and shows it. Mods without a card,
+      // or mods that don't match the card, are dropped.
       const hand = this.handOf(pid);
-      if (!card || !hand.includes(card) || JSON.stringify(modsFor(card, rest.g)) !== JSON.stringify(stripActs(mods))) mods = null;
-      else if (g.played[pid] !== card) {
-        this.ctx.setPrivateFor(pid, 'hand', hand.filter((c, i) => i !== hand.indexOf(card)));
-        this.write({ played: { ...this.g().played, [pid]: card } });
+      const fresh = this.g();
+      const already = fresh.played[pid] === card && fresh.cur[pid]?.playedN === s.n;
+      if (!card || (!hand.includes(card) && !already)) mods = null;
+      else {
+        if (JSON.stringify(modsFor(card, rest.g)) !== JSON.stringify(stripActs(mods))) mods = null;
+        if (!already) {
+          this.ctx.setPrivateFor(pid, 'hand', hand.filter((c, i) => i !== hand.indexOf(card)));
+          this.write({ played: { ...fresh.played, [pid]: card }, cur: { ...fresh.cur, [pid]: { ...fresh.cur[pid], playedN: s.n } } });
+        }
       }
     }
     return { p, v, at, mods };

@@ -69,6 +69,10 @@ export class World {
       const b = e.b;
       const v = this.ballView(pid, pid === meId, index++);
       seen.add(pid);
+      if (e.up) {
+        v.view.setVisible(false);
+        continue;
+      }
       ballPos(this.hole, b, P);
       const flying = b.mode === FLY || b.mode === ROLL;
       let fade = 1;

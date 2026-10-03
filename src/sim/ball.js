@@ -232,7 +232,7 @@ function field(hole, b, px, py, pz, c) {
     const cz = c[cp.p * 3 + 2] + cp.dz * cp.radial - pz;
     const d = Math.sqrt(cx * cx + cy * cy + cz * cz);
     if (d < MAGNET_RANGE && d > 0.01) {
-      const f = (7 * (1 - d / MAGNET_RANGE)) / d;
+      const f = (2.2 * (1 - d / MAGNET_RANGE)) / d;
       ax += cx * f;
       ay += cy * f;
       az += cz * f;
@@ -673,7 +673,8 @@ export function stepBall(hole, b) {
       ev(b, 'bounce', -vn, patch ? patch.type : pl.kind);
     } else {
       // Lands and rolls (relative to the world from here on); the touch costs the same friction a bounce would.
-      let f = sticky ? 0.25 : 1;
+      // Tar grips hard; the Sticky card only takes the bounce away.
+      let f = sticky ? (patch && patch.type === 'tar' ? 0.25 : 0.85) : 1;
       if (kick > 0) f = 1;
       if (lt > 1e-9 && !sticky) f *= (lt - Math.min(lt, mu * (1 + e) * -vn)) / lt;
       b.mode = ROLL;

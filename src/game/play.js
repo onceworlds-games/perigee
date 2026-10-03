@@ -68,6 +68,10 @@ export class Play {
       this.camera.nudge(-dx, dy);
     });
     on('press', (x, y, type) => {
+      if (this.camera.mode === 'intro') {
+        this.camera.endIntro(); // the fly-in is skippable
+        return;
+      }
       // A press on the ball starts the charge (hold to charge, release to shoot); elsewhere it orbits.
       const bp = this.ballScreen();
       if (bp && Math.hypot(bp.x - x, bp.y - y) < 64 && this.session.state() === 'aim') {
@@ -83,6 +87,10 @@ export class Play {
   }
 
   keyDown(k) {
+    if (this.camera.mode === 'intro') {
+      this.camera.endIntro();
+      return;
+    }
     const st = this.session.state();
     if (k === ' ') {
       if (st === 'aim') {
@@ -177,6 +185,10 @@ export class Play {
 
   pickCard(id) {
     if (!id) return;
+    if (id === 'mulligan') {
+      this.onMulligan?.();
+      return;
+    }
     this.session.card = this.session.card === id ? null : id;
     this.audio.click();
     if (this.session.card) {
@@ -255,7 +267,7 @@ export class Play {
       this.camera.setUp(hole.tee.dx, hole.tee.dy, hole.tee.dz, true);
       this.camera.target.set(tee[0], tee[1], tee[2]);
       this.camera.faceToward(cup[0], cup[1], cup[2]);
-      if (!settings.reducedMotion) this.camera.startIntro(cup, tee, [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
+      if (!settings.reducedMotion) this.camera.startIntro(cup, tee, [hole.tee.dx, hole.tee.dy, hole.tee.dz], [hole.cup.dx, hole.cup.dy, hole.cup.dz]);
       this.camera.wantDist = 11;
       this.audio.card();
       if (g.h === 0) this.hinted('look', touch ? 'Drag to look around' : 'Drag to look, R for the cup');
@@ -314,6 +326,12 @@ export class Play {
     // HUD.
     const bp = this.ballScreen();
     const myBall = this.session.myBall();
+    let ballR = 40;
+    if (bp && myBall) {
+      ballPos(hole, myBall, P);
+      const top = this.world.project(P[0] + this.camera.up.x * 0.35, P[1] + this.camera.up.y * 0.35, P[2] + this.camera.up.z * 0.35);
+      if (top) ballR = Math.max(28, Math.min(140, Math.hypot(top.x - bp.x, top.y - bp.y) + 22));
+    }
     const left = g.phase === 'play' ? Math.max(0, (g.endsAt - now) / 1000) : -1;
     const showTimer = g.phase === 'play' && (g.firstIn || left < 60);
     if (showTimer && left < 10 && Math.floor(left) !== this.lastTick) {
@@ -324,6 +342,7 @@ export class Play {
     this.hud.draw({
       ballX: bp && st === 'aim' ? bp.x : null,
       ballY: bp ? bp.y : 0,
+      ballR,
       charge: this.session.charging ? this.session.charge : -1,
       aiming: st === 'aim',
       timer: showTimer ? left : -1,

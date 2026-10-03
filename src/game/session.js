@@ -80,7 +80,7 @@ export class Session {
     if (!cur) return;
     const s = this.table.get(shotKey(pid));
     let e = this.balls.get(pid);
-    const restKey = `rest.${cur.n}.${cur.rest ? cur.rest.g + ':' + cur.rest.d.join(',') : 'tee'}.${cur.holed ? 'h' : ''}`;
+    const restKey = `rest.${cur.n}.${cur.rest ? cur.rest.g + ':' + cur.rest.d.join(',') : 'tee'}.${cur.holed ? 'h' : ''}${cur.up ? 'u' : ''}`;
     const live = s && s.h === g.h && s.n === cur.n + 1 && !cur.holed && !cur.up && this.validRec(s, g, hole);
     if (live) {
       const key = `shot.${s.n}.${JSON.stringify(s.acts ?? null)}.${s.at}`;
@@ -96,7 +96,7 @@ export class Session {
         const relaunch = !!(e && e.rec && e.rec.n === s.n);
         launchAt(hole, b, (s.at - g.t0) / 1000, s.p[0], s.p[1], s.p[2], s.v[0], s.v[1], s.v[2], mods);
         if (relaunch) b.events.length = 0; // an act arrived: the flight is rebuilt, its sounds were already played
-        e = { b, key, done: false, rec: s, settledAt: 0, claimed: false, relaunch };
+        e = { b, key, done: false, rec: s, settledAt: 0, claimed: false, relaunch, up: false };
         this.balls.set(pid, e);
         if (pid === this.ctx.me) this.lastShotRec = s;
       }
@@ -115,6 +115,7 @@ export class Session {
         }
       }
       this.flushEvents(pid, e);
+      e.relaunch = false;
       return;
     }
     // No live shot: the ball sits at its canonical rest (snapping if the local sim ended elsewhere).
@@ -132,11 +133,12 @@ export class Session {
       }
       b.t0 = (now - g.t0) / 1000;
       b.step = 0;
-      this.balls.set(pid, { b, key: restKey, done: true, rec: null, settledAt: now, claimed: false });
+      this.balls.set(pid, { b, key: restKey, done: true, rec: null, settledAt: now, claimed: false, up: !!cur.up });
     } else {
       // Keep a resting ball's clock current (moving worlds carry it).
       e.b.t0 = (now - g.t0) / 1000;
       e.b.step = 0;
+      e.up = !!cur.up;
     }
   }
 
@@ -233,7 +235,7 @@ export class Session {
     const pq = [q(p[0]), q(p[1]), q(p[2])];
     const card = this.card;
     const mods = card ? modsFor(card, b.g) : null;
-    const rec = { h: g.h, n: cur.n + 1, p: pq, v, at: now, mods, card: mods ? card : undefined, acts: null };
+    const rec = { h: g.h, n: cur.n + 1, p: pq, v, at: now, mods, card: card || undefined, acts: null };
     this.card = null;
     this.table.set(shotKey(this.ctx.me), rec);
     this.lastShotRec = rec;

@@ -43,7 +43,7 @@ export class Hud {
     c.textBaseline = 'middle';
     c.lineCap = 'round';
     if (s.ballX !== null && s.aiming) {
-      const r = 44;
+      const r = s.ballR ?? 44;
       c.lineWidth = 3;
       c.strokeStyle = 'rgba(243, 229, 195, 0.35)';
       c.beginPath();
@@ -78,26 +78,28 @@ export class Hud {
       c.fillText(s.strokes === 1 ? 'STROKE' : 'STROKES', x, y + 24);
       c.textAlign = 'center';
     }
-    // The hole clock, under the hole name.
+    // The hole clock and the distance line sit under the hole name: centred, or right of the platform's
+    // buttons on a narrow screen.
+    const narrow = this.w < 560;
+    const cx = narrow ? 138 + (this.w - 150) / 2 : this.w / 2;
     if (s.timer >= 0) {
       const t = Math.ceil(s.timer);
       c.font = `${s.urgent ? '400 30px' : '400 22px'} Righteous, Jost, sans-serif`;
       c.fillStyle = s.urgent ? '#f06a5c' : '#f3e5c3';
       c.shadowColor = '#11201c';
       c.shadowOffsetY = 2;
-      c.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, this.w / 2, s.safeTop + 72);
+      c.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, cx, s.safeTop + (narrow ? 66 : 72));
       c.shadowOffsetY = 0;
     }
-    // Distance and height under the hole name (clear of the corners and the hand).
     if (s.dist !== undefined && s.state !== 'watch') {
-      const y = s.safeTop + (s.timer >= 0 ? 98 : 72);
-      c.font = '700 15px Jost, sans-serif';
+      const y = s.safeTop + (s.timer >= 0 ? (narrow ? 90 : 98) : narrow ? 66 : 72);
+      c.font = `700 ${narrow ? 13 : 15}px Jost, sans-serif`;
       c.fillStyle = 'rgba(243, 229, 195, 0.9)';
       c.shadowColor = '#11201c';
       c.shadowOffsetY = 2;
       const parts = [`${Math.round(s.dist)} m to cup`];
       if (s.alt > 0.5) parts.push(`${Math.round(s.alt)} m up`);
-      c.fillText(parts.join('  ·  '), this.w / 2, y);
+      c.fillText(parts.join('  ·  '), cx, y);
       c.shadowOffsetY = 0;
     }
   }

@@ -1,4 +1,4 @@
-// Builds data/holes.json: nine verified holes for each of the eight worlds, each generated from a real solution
+// Builds data/holes.json: nine verified holes for each of the eight worlds, each built from a real solution
 // and graded. Pars are steered toward 3 x par 2, 4 x par 3 and 2 x par 4 per world, easiest first.
 //   node scripts/gen-holes.mjs [world]
 import { writeFileSync, mkdirSync } from 'node:fs';
