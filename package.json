@@ -1,0 +1,24 @@
+{
+  "name": "perigee",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test test/*.test.mjs",
+    "balance": "node scripts/balance.mjs",
+    "holes": "node scripts/gen-holes.mjs",
+    "store": "node scripts/store.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@fontsource/jost": "^5.2.0",
+    "@fontsource/righteous": "^5.2.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}
