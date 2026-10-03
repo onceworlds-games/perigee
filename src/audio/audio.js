@@ -40,7 +40,7 @@ export class Audio {
       }
       this.ctx = c;
       this.master = c.createGain();
-      this.master.gain.value = 0.7;
+      this.master.gain.value = 0.45;
       const comp = c.createDynamicsCompressor();
       comp.threshold.value = -16;
       comp.knee.value = 10;
@@ -222,10 +222,37 @@ export class Audio {
     const v = (Math.random() - 0.5) * 0.15;
     if (kind === 'metal' || kind === 'comet') this.tone(900 * (1 + v), { type: 'triangle', partials: [[1, 1], [2.7, 0.4], [5.1, 0.2]], gain: 0.13 + s * 0.17, decay: 0.3 });
     else if (kind === 'ice') this.tone(1800 * (1 + v), { type: 'sine', partials: [[1, 1], [3, 0.2]], gain: 0.09 + s * 0.13, decay: 0.22 });
-    else if (kind === 'moss') this.noise({ gain: 0.12 + s * 0.2, decay: 0.16, freq: 160, q: 0.6, type: 'lowpass' });
-    else if (kind === 'pad') this.tone(220, { type: 'square', gain: 0.12 + s * 0.1, decay: 0.35, partials: [[1, 0.6], [1.5, 0.4], [2, 0.3]] });
-    else this.noise({ gain: 0.1 + s * 0.22, decay: 0.14, freq: 300 * (1 + v), q: 0.8, type: 'lowpass' });
+    else if (kind === 'moss') {
+      this.thump(95 * (1 + v), 0.14 + s * 0.2, 0.12);
+      this.noise({ gain: 0.4 + s * 0.6, decay: 0.12, freq: 160, q: 0.6, type: 'lowpass' });
+    } else if (kind === 'pad') this.tone(220, { type: 'square', gain: 0.12 + s * 0.1, decay: 0.35, partials: [[1, 0.6], [1.5, 0.4], [2, 0.3]] });
+    else {
+      // Dust, meadow, lava: a soft body thump with a puff of grit on top.
+      this.thump(130 * (1 + v), 0.12 + s * 0.22, 0.1);
+      this.noise({ gain: 0.18 + s * 0.42, decay: 0.12, freq: 700 * (1 + v), q: 0.9, type: 'bandpass' });
+    }
     if (kind === 'pad') this.boing();
+  }
+
+  /** A short sine thump falling in pitch (a ball landing on something soft). */
+  thump(freq, gain, decay) {
+    if (!this.ready) return;
+    try {
+      const c = this.ctx;
+      const t = c.currentTime;
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq * 1.6, t);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + decay);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(gain, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.001, t + decay + 0.05);
+      o.connect(g);
+      g.connect(this.master);
+      o.start(t);
+      o.stop(t + decay + 0.1);
+    } catch {}
   }
 
   boing() {
@@ -276,8 +303,8 @@ export class Audio {
       s.loop = true;
       const g = c.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.35, t + 0.25);
-      g.gain.linearRampToValueAtTime(0.2, t + 0.8);
+      g.gain.linearRampToValueAtTime(0.75, t + 0.25);
+      g.gain.linearRampToValueAtTime(0.42, t + 0.8);
       g.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
       g.connect(this.master);
       for (const [f0, f1, q] of [[350, 450, 8], [700, 900, 10], [2400, 2600, 14]]) {
@@ -324,11 +351,11 @@ export class Audio {
   }
 
   click() {
-    this.tone(1200 + Math.random() * 200, { type: 'square', gain: 0.05, decay: 0.05 });
+    this.tone(1200 + Math.random() * 200, { type: 'triangle', gain: 0.14, attack: 0.002, decay: 0.06 });
   }
 
   tick(urgent) {
-    this.tone(urgent ? 1400 : 1000, { type: 'square', gain: 0.045, decay: 0.04 });
+    this.tone(urgent ? 1400 : 1000, { type: 'triangle', gain: urgent ? 0.16 : 0.12, attack: 0.002, decay: 0.07 });
   }
 
   card() {
@@ -341,12 +368,12 @@ export class Audio {
     if (!this.ready) return;
     try {
       const t = this.ctx.currentTime;
-      const hum = playing ? Math.max(0, 1 - near / 12) * 0.1 : 0;
+      const hum = playing ? Math.max(0, 1 - near / 12) * 0.04 : 0;
       this.humGain.gain.setTargetAtTime(hum, t, 0.2);
       const w = playing ? Math.min(1, speed / 30) : 0;
-      this.whooshGain.gain.setTargetAtTime(w * 0.18, t, 0.1);
+      this.whooshGain.gain.setTargetAtTime(w * 0.08, t, 0.1);
       this.whooshFilter.frequency.setTargetAtTime(300 + w * 1400, t, 0.1);
-      this.padGain.gain.setTargetAtTime(0.16, t, 1.5);
+      this.padGain.gain.setTargetAtTime(0.14, t, 1.5);
       this.padFilter.frequency.setTargetAtTime(320 + Math.min(altitude, 30) * 22 + (reduced ? 0 : Math.sin(t * 0.2) * 60), t, 0.8);
       const chord = Math.floor(t / CHORD_S) % CHORDS.length;
       if (chord !== this.chord) {
