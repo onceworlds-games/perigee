@@ -120,8 +120,21 @@ export class Session {
     }
     // No live shot: the ball sits at its canonical rest (snapping if the local sim ended elsewhere).
     if (!e || e.key !== restKey) {
-      const stale = e && e.rec && !e.done && now - (e.rec.at ?? 0) < SNAP_GRACE_MS && e.rec.n === cur.n;
-      if (stale) return; // the authority settled it before this page finished: give the flight a moment
+      if (e && e.rec && !e.done && e.rec.h === g.h && e.rec.n <= cur.n) {
+        // The authority settled this shot before this page's flight finished: let it finish (it ends in the same
+        // place), with a short grace from the moment the record changed.
+        if (!e.settleSeen) e.settleSeen = now;
+        const target = Math.floor((now - e.rec.at) / 1000 / DT);
+        let k = 0;
+        const b = e.b;
+        while (b.step < target && k < MAX_CATCHUP && b.mode !== REST && b.mode !== HOLED) {
+          stepBall(hole, b);
+          k++;
+        }
+        this.flushEvents(pid, e);
+        if (b.mode === REST || b.mode === HOLED) e.done = true;
+        else if (now - e.settleSeen < SNAP_GRACE_MS) return;
+      }
       const b = e?.b ?? makeBall(hole, hole.tee.p, [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
       if (cur.holed) {
         b.mode = HOLED;

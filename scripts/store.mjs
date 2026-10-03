@@ -6,10 +6,10 @@ import { serve, launch, sleep } from './cdp.mjs';
 
 const BADGES = ['first-cup', 'slingshot', 'perigee', 'aerobrake', 'lost-in-space', 'photo-finish', 'under-par', 'daily-streak-7', 'wild-card', 'full-course', 'level-10'];
 const SHOTS = [
-  ['thumb1', 1280, 720, 'store/thumb-1.png'],
+  ['thumb4', 1280, 720, 'store/thumb-1.png'], // the cover: a ball leaving a wormhole
   ['thumb2', 1280, 720, 'store/thumb-2.png'],
   ['thumb3', 1280, 720, 'store/thumb-3.png'],
-  ['thumb4', 1280, 720, 'store/thumb-4.png'],
+  ['thumb1', 1280, 720, 'store/thumb-4.png'],
   ['icon', 512, 512, 'store/icon.png'],
   ...BADGES.map((id) => [`badge-${id}`, 256, 256, `store/badges/${id}.png`]),
 ];

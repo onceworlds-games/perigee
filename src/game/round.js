@@ -192,6 +192,7 @@ export class Round {
     }
     if (g.phase === 'between') {
       this.dealPicks(g);
+      this.hole(g.h + 1, g); // a runtime hole is built in slices during the intermission
       if (now >= g.until || this.everyoneOk(g, g.h)) this.nextHole(g);
       return;
     }

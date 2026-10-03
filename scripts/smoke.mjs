@@ -21,8 +21,14 @@ async function session(width, height, mobile, name, secs) {
   await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?test=auto${mobile ? '&touch=1' : ''}` });
   const t0 = Date.now();
   let last = '';
+  let lostTried = false;
   while (Date.now() - t0 < secs * 1000) {
     await sleep(2000);
+    if (!lostTried && Date.now() - t0 > 12000) {
+      // Lose and restore the WebGL context mid-play: the game must carry on without an exception.
+      lostTried = true;
+      await b.evaluate(`(() => { const gl = window.__perigee?.gfx?.renderer?.getContext(); const ext = gl?.getExtension('WEBGL_lose_context'); if (ext) { ext.loseContext(); setTimeout(() => ext.restoreContext(), 800); return 'lost'; } return 'no ext'; })()`).then((r) => console.log(`[${name}] context loss: ${r}`));
+    }
     const st = await b.evaluate(`(() => { const a = window.__perigee; if (!a) return 'boot'; const g = a.round?.g?.(); return [a.mode, g?.phase, g?.h, a.session?.state?.(), g?.cur?.[a.room?.me?.id]?.n, Math.round(a.gfx.frameMs)].join(' ') })()`);
     if (st !== last) {
       console.log(`[${name}] ${Math.round((Date.now() - t0) / 1000)}s ${st}`);

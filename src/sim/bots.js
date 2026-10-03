@@ -10,8 +10,8 @@ import { centersAt, q, MAX_PLANETS } from './hole.js';
 export const TIERS = {
   rookie: { name: 'Rookie', n: 50, ang: 0.08, pow: 0.09, think: [3, 6], explore: 0.5, horizon: 2.5, check: 0 },
   club: { name: 'Club', n: 100, ang: 0.06, pow: 0.07, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
-  pro: { name: 'Pro', n: 220, ang: 0.05, pow: 0.06, think: [2, 4], explore: 0.35, horizon: 6, check: 3 },
-  legend: { name: 'Legend', n: 300, ang: 0.036, pow: 0.045, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
+  pro: { name: 'Pro', n: 220, ang: 0.06, pow: 0.07, think: [2, 4], explore: 0.35, horizon: 6, check: 3 },
+  legend: { name: 'Legend', n: 300, ang: 0.045, pow: 0.055, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
 };
 export const TIER_IDS = ['rookie', 'club', 'pro', 'legend'];
 export const BOT_NAMES = ['Dot', 'Pip', 'Juniper', 'Bramble', 'Tansy', 'Fig', 'Quill', 'Sorrel', 'Ziggy', 'Marlow', 'Nettle', 'Clove'];

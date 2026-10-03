@@ -13,6 +13,28 @@ const check = (ok, what) => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`);
   if (!ok) failed++;
 };
+/** After a reload: wait for the title, press Play, and make sure the page left the title. */
+async function reenter(p) {
+  // p.frame throws while the page has no game frame yet, so every call is guarded.
+  const ev = async (expr) => {
+    try {
+      return await p.frame(expr);
+    } catch {
+      return null;
+    }
+  };
+  for (let i = 0; i < 60; i++) {
+    if ((await ev('window.__perigee?.mode')) === 'title') break;
+    await sleep(250);
+  }
+  for (let i = 0; i < 10; i++) {
+    await ev("document.querySelector('.btn.big')?.click()");
+    await sleep(500);
+    const m = await ev('window.__perigee?.mode');
+    if (m && m !== 'title') break;
+  }
+  await ev('window.__perigee.auto = true');
+}
 const state = (p) => p.frame(`(() => { const a = window.__perigee; const g = a?.round?.g?.(); const r = onceworlds.rooms.current; return JSON.stringify({ mode: a?.mode, phase: g?.phase, h: g?.h, mid: g?.mid, by: g?.by, players: g?.players?.length, st: a?.session?.state?.(), host: r?.host, me: r?.me?.id, isHost: r?.isHost, match: r?.match?.phase, n: g?.cur?.[r?.me?.id]?.n }) })()`).then((s) => JSON.parse(s ?? '{}'));
 try {
   await Promise.all(P.map((p) => p.open('/play/perigee')));
@@ -47,10 +69,7 @@ try {
       const g = (hostIdx + 1) % 3;
       console.log(`-- reload guest ${g}`);
       await P[g].reload();
-      await sleep(2500);
-      await P[g].frame("document.querySelector('.btn.big')?.click()");
-      await sleep(800);
-      await P[g].frame('window.__perigee.auto = true');
+      await reenter(P[g]);
     } else if (!did.drop && el > 30000) {
       did.drop = true;
       const g = (hostIdx + 2) % 3;
@@ -60,10 +79,7 @@ try {
       did.reloadHost = true;
       console.log(`-- reload host ${hostIdx}`);
       await P[hostIdx].reload();
-      await sleep(2500);
-      await P[hostIdx].frame("document.querySelector('.btn.big')?.click()");
-      await sleep(800);
-      await P[hostIdx].frame('window.__perigee.auto = true');
+      await reenter(P[hostIdx]);
     }
   }
   const s = await Promise.all(P.map(state));
