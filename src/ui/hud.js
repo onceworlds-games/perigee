@@ -42,6 +42,29 @@ export class Hud {
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.lineCap = 'round';
+    // Name tags over other players' balls: their colour as a dot, the name in cream (fillText: names are untrusted).
+    if (s.tags && s.tags.length) {
+      c.font = '700 13px Jost, sans-serif';
+      c.textBaseline = 'bottom';
+      for (const t of s.tags) {
+        const name = t.name.length > 16 ? `${t.name.slice(0, 15)}…` : t.name;
+        const w = c.measureText(name).width;
+        const a = Math.max(0.35, Math.min(1, 1.4 - t.d / 60));
+        c.globalAlpha = a;
+        c.fillStyle = 'rgba(11, 31, 26, 0.72)';
+        c.beginPath();
+        c.roundRect?.(t.x - w / 2 - 15, t.y - 20, w + 24, 19, 9);
+        c.fill();
+        c.fillStyle = `#${(t.colour ?? 0x2a8f8a).toString(16).padStart(6, '0')}`;
+        c.beginPath();
+        c.arc(t.x - w / 2 - 5, t.y - 10.5, 4, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = t.watched ? '#f3c080' : '#f3e5c3';
+        c.fillText(name, t.x + 5, t.y - 3);
+      }
+      c.globalAlpha = 1;
+      c.textBaseline = 'middle';
+    }
     if (s.ballX !== null && s.aiming) {
       const r = s.ballR ?? 44;
       c.lineWidth = 3;

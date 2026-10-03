@@ -327,6 +327,9 @@ export class HoleView {
       const d = this.camPos.copy(this.gfx.camera.position).distanceTo(this.cup.position);
       this.beamMat.uniforms.uAlpha.value = Math.max(0, Math.min(0.55, (d - 22) / 30));
       this.beam.visible = d > 22;
+      // Far away it widens, so the cup still reads from across the system.
+      const k = Math.max(1, Math.min(3.5, d / 30));
+      this.beam.scale.set(k, 1, k);
     }
     if (!reduced) {
       for (const r of this.rings) r.rotation.z = t * 0.6;

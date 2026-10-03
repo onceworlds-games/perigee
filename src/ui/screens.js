@@ -354,10 +354,11 @@ export class Screens {
     return s;
   }
 
-  final({ rows, room, onDone, title, xpLine, over, doneLabel = 'Done' }) {
+  final({ rows, room, onDone, title, xpLine, over, doneLabel = 'Done', head = 'Scorecard' }) {
     const s = $('div', 'screen lobby');
     s.append($('div', 'word coral', title));
     const card = $('div', 'card');
+    card.append($('h2', '', head));
     card.append(this.resultsTable(rows, room));
     if (xpLine) card.append($('div', 'badgeline', xpLine));
     s.append(card);

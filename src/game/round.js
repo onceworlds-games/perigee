@@ -12,7 +12,7 @@ import { strokeCap, standings } from '../sim/score.js';
 import { draftFor, cleanMods, modsFor, CARD_IDS, HAND_MAX } from '../sim/cards.js';
 import { autoWorld, WORLD_IDS, WORLD_PAIRS } from '../sim/worlds.js';
 import { makeRng, seedOf } from '../sim/rng.js';
-import { G_KEY, shotKey } from './table.js';
+import { G_KEY, shotKey, restOf } from './table.js';
 
 export const INTRO_MS = 4500;
 const BOT_BUDGET_MS = 3;
@@ -236,7 +236,8 @@ export class Round {
       if (!entry || entry.key !== key) {
         const rec = this.validShot(g, hole, pid, s, cur);
         if (!rec) continue;
-        const b = makeBall(hole, cur.rest ? cur.rest.g : hole.tee.p, cur.rest ? cur.rest.d : [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
+        const r0 = restOf(cur.rest, hole);
+        const b = makeBall(hole, r0 ? r0.g : hole.tee.p, r0 ? r0.d : [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
         b.quiet = true;
         launchAt(hole, b, (rec.at - g.t0) / 1000, rec.p[0], rec.p[1], rec.p[2], rec.v[0], rec.v[1], rec.v[2], rec.mods);
         entry = { b, key, done: false, rec };
@@ -268,7 +269,7 @@ export class Round {
     // Must leave from where the ball rests (at that time), at most full power plus the world's own motion.
     const t = (at - g.t0) / 1000;
     const c = centersAt(hole, t, CS);
-    const rest = cur.rest ?? { g: hole.tee.p, d: [hole.tee.dx, hole.tee.dy, hole.tee.dz] };
+    const rest = restOf(cur.rest, hole) ?? { g: hole.tee.p, d: [hole.tee.dx, hole.tee.dy, hole.tee.dz] };
     const b = makeBall(hole, rest.g, rest.d);
     b.t0 = t;
     const rp = ballPos(hole, b, [0, 0, 0]);
@@ -302,9 +303,26 @@ export class Round {
     return { p, v, at, mods };
   }
 
+  /**
+   * A player's hand. It is their own private value (hidden from everyone but them and the host), so they could write
+   * anything into it: it is read as at most three known cards, each no more often than the drafts so far offered it
+   * to them. A forged hand can only ever hold cards the player could have drafted; it never reaches another page.
+   */
   handOf(pid) {
     const h = this.ctx.privateOf(pid)?.hand;
-    return Array.isArray(h) ? h.filter((c) => CARD_IDS.includes(c)).slice(0, HAND_MAX) : [];
+    if (!Array.isArray(h)) return [];
+    const g = this.g();
+    const offered = new Map();
+    const upto = g && Array.isArray(g.holes) ? Math.min(g.holes.length, (Number.isInteger(g.h) ? g.h : 0) + 1) : 0;
+    for (let i = 0; i < upto; i++) for (const c of draftFor(this.ctx.seed, i, pid)) offered.set(c, (offered.get(c) ?? 0) + 1);
+    const out = [];
+    for (const c of h.slice(0, 8)) {
+      if (typeof c !== 'string' || !CARD_IDS.includes(c) || !(offered.get(c) > 0)) continue;
+      offered.set(c, offered.get(c) - 1);
+      out.push(c);
+      if (out.length >= HAND_MAX) break;
+    }
+    return out;
   }
 
   /** The authority's ball for pid came to rest or dropped: write the canonical result (the shooter's claim if it agrees). */
@@ -448,7 +466,7 @@ export class Round {
       const n = cur.n + 1;
       if (!bot || bot.n !== n) {
         const rng = makeRng(seedOf(this.ctx.seed, g.h, pid, n));
-        const rest = cur.rest ?? { g: hole.tee.p, d: [hole.tee.dx, hole.tee.dy, hole.tee.dz] };
+        const rest = restOf(cur.rest, hole) ?? { g: hole.tee.p, d: [hole.tee.dx, hole.tee.dy, hole.tee.dz] };
         const ball = makeBall(hole, rest.g, rest.d);
         const think = thinkTime(g.bots[pid].tier, rng);
         const at = now + think * 1000;

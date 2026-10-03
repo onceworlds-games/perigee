@@ -68,7 +68,7 @@ export class World {
     let e = this.balls.get(pid);
     if (!e) {
       const look = me ? this.myLook : { body: PALETTE.cream, stripe: TINTS[index % TINTS.length], trail: TINTS[index % TINTS.length], tint: TINTS[index % TINTS.length] };
-      e = { view: new BallView(this.gfx, look, !me), sinkT: 0 };
+      e = { view: new BallView(this.gfx, look, !me), sinkT: 0, tint: look.tint ?? look.stripe };
       this.balls.set(pid, e);
     }
     return e;

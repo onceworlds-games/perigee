@@ -1,15 +1,15 @@
-// Renders the store art with the game's own scenes (?poster=...) in headless Chrome (WebGL through SwiftShader)
-// and saves it into store/.
+// Renders the store art with the game's own scenes (?poster=...) in headless Chrome on the machine's GPU at the
+// high tier (GPU=0 for the software renderer) and saves it into store/.
 //   npm run build && npm run store [only]
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { serve, launch, sleep } from './cdp.mjs';
 
 const BADGES = ['first-cup', 'slingshot', 'perigee', 'aerobrake', 'lost-in-space', 'photo-finish', 'under-par', 'daily-streak-7', 'wild-card', 'full-course', 'level-10'];
 const SHOTS = [
-  ['thumb4', 1280, 720, 'store/thumb-1.png'], // the cover: a ball leaving a wormhole
-  ['thumb2', 1280, 720, 'store/thumb-2.png'],
-  ['thumb3', 1280, 720, 'store/thumb-3.png'],
-  ['thumb1', 1280, 720, 'store/thumb-4.png'],
+  ['thumb1', 1280, 720, 'store/thumb-1.png'], // the cover: a ball arcing round a ringed giant, the cup lit far off
+  ['thumb3', 1280, 720, 'store/thumb-2.png'], // skimming a lava moon
+  ['thumb2', 1280, 720, 'store/thumb-3.png'], // four balls on one green, the flag ahead
+  ['thumb4', 1280, 720, 'store/thumb-4.png'], // the whole shot drawn across its system
   ['icon', 512, 512, 'store/icon.png'],
   ...BADGES.map((id) => [`badge-${id}`, 256, 256, `store/badges/${id}.png`]),
 ];
@@ -17,12 +17,12 @@ const SHOTS = [
 const only = process.argv[2];
 mkdirSync('store/badges', { recursive: true });
 const { server, port } = await serve('dist');
-const b = await launch({ width: 1280, height: 720 });
+const b = await launch({ width: 1280, height: 720, gpu: true });
 for (const [kind, w, h, out] of SHOTS) {
   if (only && !kind.includes(only) && !out.includes(only)) continue;
   await b.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
   await b.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: kind.startsWith('badge') ? 0 : 1 } });
-  await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?poster=${kind}` });
+  await b.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?poster=${kind}&quality=high` });
   let ok = false;
   for (let i = 0; i < 300 && !ok; i++) {
     await sleep(100);

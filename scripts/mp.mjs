@@ -1,7 +1,8 @@
 // Three guests on the local platform: lobby, start, autopilot play, a reload of each role, a dropped connection, a
 // host change, and the checks that matter (everyone sees the same round record, nothing threw, no budget warnings).
 //   npm run build && (deploy) && node scripts/mp.mjs [seconds] [base]
-import { launch } from '/Users/gowravthota/Desktop/commit/onceworlds-games/_tools/mp-lib.mjs';
+// The multi-guest browser driver lives beside the games (MP_LIB points elsewhere).
+const { launch } = await import(process.env.MP_LIB ?? new URL('../../_tools/mp-lib.mjs', import.meta.url).href);
 
 const seconds = Number(process.argv[2] ?? 70);
 const base = process.argv[3] ?? 'http://localhost:8787';

@@ -4,42 +4,44 @@ import * as THREE from 'three';
 import { Gfx, PALETTE } from './render/gfx.js';
 import { Backdrop } from './render/backdrop.js';
 import { World } from './render/world.js';
-import { prepareHole, cupPos } from './sim/hole.js';
-import { makeBall, launchAt, stepBall, ballPos, DT, FLY, ROLL } from './sim/ball.js';
-import { teeShot } from './sim/gen.js';
+import { BallView } from './render/ball.js';
+import { prepareHole, cupPos, centersAt, MAX_PLANETS } from './sim/hole.js';
+import { makeBall, launchAt, stepBall, ballPos, DT, FLY, ROLL, HOLED, REST, LOST } from './sim/ball.js';
 import library from '../data/holes.json';
 import { drawBadge } from './ui/badges.js';
 
-const holeById = (id) => library.holes.find((h) => h.id === id) ?? library.holes[0];
+const SHOWCASE_SEED = 3728827386; // "Tail Slingshot": round a ringed giant to a cup across the system
 const P = [0, 0, 0];
+const C = new Float64Array(MAX_PLANETS * 3);
 const v = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+const LOOK = { body: PALETTE.cream, stripe: PALETTE.coral, trail: PALETTE.coral, flag: PALETTE.coral };
+const params = new URLSearchParams(location.search);
+const num = (k, d) => (params.has(k) ? Number(params.get(k)) : d);
 
-/** Flies a hole's reference shot until `until(b)` says stop (or `seconds` pass), building the trail in the view. */
-function fly(world, h, pid, look, seconds, until = null, offset = null) {
+/** Flies a hole's reference shot until `until(b, i)` says stop (or it ends), drawing the trail into `view`. */
+function fly(h, view, until = null) {
   const b = makeBall(h, h.tee.p, [h.tee.dx, h.tee.dy, h.tee.dz]);
   b.quiet = true;
-  const ref = h.ref;
-  teeShot(h, b, ref.t0, offset ?? ref.dir, ref.speed);
-  const view = world.ballView(pid, pid === 'me', Number(pid.slice(-1)) || 0);
-  if (pid === 'me') view.view.setLook(look);
-  const steps = Math.floor(seconds * 120);
-  for (let i = 0; i < steps; i++) {
+  const r = h.ref;
+  launchAt(h, b, r.t0, r.p[0], r.p[1], r.p[2], r.v[0], r.v[1], r.v[2], null);
+  for (let i = 0; i < 120 * 40; i++) {
     stepBall(h, b);
     if (i % 2 === 0) {
       ballPos(h, b, P);
-      view.view.update(h, b.t0 + b.step * DT, P[0], P[1], P[2], b.vx, b.vy, b.vz, DT * 2, b.mode === FLY || b.mode === ROLL, 1);
+      view.update(h, b.t0 + b.step * DT, P[0], P[1], P[2], b.vx, b.vy, b.vz, DT * 2, b.mode === FLY || b.mode === ROLL, 1);
     }
+    if (b.mode === HOLED || b.mode === REST || b.mode === LOST) break;
     if (until && until(b, i)) break;
   }
   ballPos(h, b, P);
-  view.view.update(h, b.t0 + b.step * DT, P[0], P[1], P[2], b.vx, b.vy, b.vz, DT, b.mode === FLY || b.mode === ROLL, 1);
-  return { b, p: P.slice(), t: b.t0 + b.step * DT, view };
+  view.update(h, b.t0 + b.step * DT, P[0], P[1], P[2], b.vx, b.vy, b.vz, DT, b.mode === FLY || b.mode === ROLL, 1);
+  return { b, p: P.slice(), t: b.t0 + b.step * DT };
 }
 
-function restOn(world, h, pid, look, planet, dir, index) {
+function restOn(world, h, pid, planet, dir, index) {
   const b = makeBall(h, planet, dir);
   const view = world.ballView(pid, pid === 'me', index);
-  if (pid === 'me') view.view.setLook(look);
+  if (pid === 'me') view.view.setLook(LOOK);
   const p = ballPos(h, b, [0, 0, 0]);
   view.view.update(h, 0, p[0], p[1], p[2], 0, 0, 0, DT, false, 1);
   return p;
@@ -54,8 +56,9 @@ function place(gfx, eye, target, up, fov = 50) {
   gfx.camera.updateProjectionMatrix();
 }
 
-function unit(a) {
-  return v(a).normalize();
+function centre(h, i, t = 0) {
+  const c = centersAt(h, t, C);
+  return new THREE.Vector3(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]);
 }
 
 export async function run(kind) {
@@ -76,136 +79,147 @@ export async function run(kind) {
   const gfx = new Gfx(document.getElementById('game'));
   gfx.autoLevel = 2;
   gfx.applyQuality();
-  const backdrop = new Backdrop(gfx, kind === 'thumb3' ? 3 : kind === 'thumb4' ? 5 : 7);
+  gfx.shared.uTime.value = 3.1;
+  const backdrop = new Backdrop(gfx, 7);
   const world = new World(gfx);
-  const look = { body: PALETTE.cream, stripe: PALETTE.coral, trail: PALETTE.coral, flag: PALETTE.coral };
-  world.setLook(look);
-  let t = 0;
+  world.setLook(LOOK);
+  const show = library.holes.find((h) => h.seed === SHOWCASE_SEED) ?? library.holes.find((h) => h.world === 'comet');
+  let fov = 52;
   if (kind === 'thumb1') {
-    // A ball bending round a world toward a distant cup, trail glowing.
-    const data = library.holes.find((h) => h.feat === 'sling' && h.grade.flight > 7 && h.grade.flight < 16) ?? holeById('binary-4');
-    const h = prepareHole(data);
-    world.setHole(h, 4);
-    // Stop just past the closest pass to the world the ball swings round.
-    let passAt = -1;
-    const me = fly(world, h, 'me', look, h.grade.flight, (b, i) => {
-      let near = 1e9;
-      for (let k = 0; k < h.n; k++) if (k !== h.tee.p && k !== h.cup.p && b.passes[k] < near) near = b.passes[k];
-      if (passAt < 0 && near < 6.5) passAt = i;
-      return passAt >= 0 && i > passAt + 70;
+    // The cover: a ball mid-arc round a ringed giant, its trail glowing back to the tee, the cup lit far ahead.
+    const h = prepareHole(show);
+    world.setHole(h, 41);
+    const gi = h.planets.findIndex((p) => p.gas);
+    const view = new BallView(gfx, LOOK, false, { trail: 320, width: num('w', 7), step: 0.3, scale: num('s', 4), cues: false });
+    let past = -1;
+    const after = num('after', 40);
+    const me = fly(h, view, (b, i) => {
+      if (past < 0 && gi >= 0 && b.passes[gi] < 6) past = i;
+      return past >= 0 && i > past + after;
     });
-    t = me.t;
-    const cup = v(cupPos(h, t));
     const pos = v(me.p);
-    const vel = new THREE.Vector3(me.b.vx, me.b.vy, me.b.vz).normalize();
-    // Up: away from the nearest world; eye behind and above the ball, looking a little ahead of it.
-    const up = nearestUp(h, t, me.p);
-    const eye = pos.clone().addScaledVector(vel, -6).addScaledVector(up, 2.6);
-    const target = pos.clone().addScaledVector(vel, 5).lerp(cup, 0.15);
-    place(gfx, eye, target, up, 60);
-    world.holeView.update(t, 0, true);
-    for (let i = 0; i < 3; i++) world.fx.burst(me.p, [up.x, up.y, up.z], 6, { colours: [0xf3e5c3, 0xf06a5c], speed: 1, size: 1.4, decay: 0.01, spread: 1.2 });
+    const giant = centre(h, gi >= 0 ? gi : h.cup.p);
+    const cupWorld = centre(h, h.cup.p);
+    // Beyond the giant from the cup, swung to one side and a little above its rings: the giant and its rings on
+    // one side, the ball and its glowing arc across it, the cup's world and beacon far off on the other.
+    const Y = new THREE.Vector3(0, 1, 0);
+    if (params.get('mode') !== 'near') {
+      const base = giant.clone().sub(cupWorld).setY(0).normalize();
+      const yaw = (num('yaw', -38) * Math.PI) / 180;
+      const pitch = (num('pitch', 14) * Math.PI) / 180;
+      const dir = base.clone().applyAxisAngle(Y, yaw);
+      dir.multiplyScalar(Math.cos(pitch)).setY(Math.sin(pitch));
+      const eye = giant.clone().addScaledVector(dir, num('dist', 44));
+      const target = giant.clone().lerp(pos, num('t', 0.6)).lerp(cupWorld, num('ahead', 0.12)).addScaledVector(Y, num('ty', -3));
+      fov = num('fov', 50);
+      place(gfx, eye, target, Y, fov);
+    } else {
+      // Close behind the ball, outside its curve: the ball and its arc up front, the ringed giant behind it, the
+      // cup's world and its beacon beyond.
+      const vel = new THREE.Vector3(me.b.vx, me.b.vy, me.b.vz).setY(0).normalize();
+      const out = pos.clone().sub(giant).setY(0).normalize();
+      const eye = pos.clone().addScaledVector(out, num('out', 10)).addScaledVector(vel, -num('back', 6)).addScaledVector(Y, num('up', 3));
+      const target = pos.clone().lerp(giant, num('t', 0.35)).lerp(cupWorld, num('ahead', 0.05));
+      fov = num('fov', 52);
+      place(gfx, eye, target, Y, fov);
+    }
   } else if (kind === 'thumb2') {
-    // Four balls on one tiny meadow world, shadows under them, the flag ahead.
-    const data = library.holes.find((h) => h.world === 'pebble' && h.planets[h.cup.p].k === 'meadow') ?? holeById('pebble-3');
+    // Four balls on one small meadow, shadows under them, the flag ahead.
+    const data = library.holes.find((h) => h.world === 'pebble' && h.planets[h.cup.p].k === 'meadow') ?? library.holes[0];
     const h = prepareHole(data);
     world.setHole(h, 3);
-    const d = [h.cup.dx, h.cup.dy, h.cup.dz];
+    const upv = v([h.cup.dx, h.cup.dy, h.cup.dz]).normalize();
     const cup = v(cupPos(h, 0));
     const pl = h.planets[h.cup.p];
-    // Balls a few metres short of the cup, spread sideways.
-    const upv = unit(d);
     const side = new THREE.Vector3(0, 1, 0).cross(upv).normalize();
     if (side.lengthSq() < 0.1) side.set(1, 0, 0);
     const back = upv.clone().cross(side).normalize();
-    const spots = [[0, 4.5], [1.8, 6.2], [-2.2, 7.4], [3.4, 8.8]];
+    const spots = [[0, 7.2], [1.7, 5.0], [-1.5, 3.9], [0.8, 2.4]];
     let mine = null;
     spots.forEach(([s, bk], i) => {
       const dir = upv.clone().addScaledVector(side, s / pl.R).addScaledVector(back, bk / pl.R).normalize();
-      const p = restOn(world, h, i === 0 ? 'me' : `p${i}`, look, h.cup.p, [dir.x, dir.y, dir.z], i);
+      const p = restOn(world, h, i === 0 ? 'me' : `p${i}`, h.cup.p, [dir.x, dir.y, dir.z], i);
       if (i === 0) mine = v(p);
     });
-    const eye = mine.clone().addScaledVector(back, 7).addScaledVector(upv, 3.2).addScaledVector(side, -1.5);
-    place(gfx, eye, mine.clone().lerp(cup, 0.45).addScaledVector(upv, 0.4), upv, 52);
-    world.holeView.update(0, 0, true);
+    const eye = mine.clone().addScaledVector(back, num('back', 4.6)).addScaledVector(upv, num('up', 2.1)).addScaledVector(side, num('side', -1.0));
+    fov = num('fov', 52);
+    place(gfx, eye, mine.clone().lerp(cup, num('t', 0.55)).addScaledVector(upv, 0.6), upv, fov);
   } else if (kind === 'thumb3') {
-    // A lava moon: the ball resting on glowing rock, a bounce pad nearby, another world above.
-    const data = library.holes.find((h) => h.world === 'lava' && h.planets[h.cup.p].k === 'lava') ?? library.holes.find((h) => h.world === 'lava');
+    // Lava Moons: a ball in flight past a moon of glowing cracks.
+    const data = library.holes.find((h) => h.world === 'lava' && h.planets.some((p) => p.k === 'lava') && h.grade.flight > 6) ?? library.holes.find((h) => h.world === 'lava');
     const h = prepareHole(data);
     world.setHole(h, 5);
-    const lava = h.planets.findIndex((p) => p.kind === 'lava');
-    const pi = lava >= 0 ? lava : h.cup.p;
-    const pl = h.planets[pi];
-    // Face the pad if there is one, else the cup side.
-    const pad = pl.patches.find((p) => p.type === 'pad');
-    const upv = pad ? new THREE.Vector3(pad.ux, pad.uy, pad.uz).applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.5).normalize() : unit([h.cup.dx, h.cup.dy, h.cup.dz]);
-    const p = restOn(world, h, 'me', look, pi, [upv.x, upv.y, upv.z], 0);
-    const mine = v(p);
-    const padDir = pad ? new THREE.Vector3(pad.ux, pad.uy, pad.uz) : upv;
-    const toward = padDir.clone().sub(upv).normalize();
-    if (toward.lengthSq() < 0.01) toward.set(1, 0, 0);
-    const eye = mine.clone().addScaledVector(toward, -6.5).addScaledVector(upv, 2.6);
-    place(gfx, eye, mine.clone().addScaledVector(toward, 4).addScaledVector(upv, 0.5), upv, 55);
-    world.holeView.update(0, 0, true);
-    world.planets?.forEach?.(() => {});
-    gfx.shared.uTime.value = 3.1;
-  } else if (kind === 'thumb4') {
-    // Wormhole Alley: the ball leaving a portal, the other end glowing across the gap.
-    const data = library.holes.find((h) => h.feat === 'warp') ?? holeById('wormhole-4');
-    const h = prepareHole(data);
-    world.setHole(h, 6);
-    const me = fly(world, h, 'me', look, h.grade.flight, (b) => b.warps > 0 && b.wormCool < 50);
-    t = me.t;
+    const li = Math.max(0, h.planets.findIndex((p) => p.kind === 'lava'));
+    const view = new BallView(gfx, LOOK, false, { trail: 200, width: 2.2, step: 0.3, scale: 1.6, cues: false });
+    const lava = centre(h, li);
+    // Stop where the flight comes nearest the lava moon.
+    let best = 1e9;
+    let bestI = 240;
+    {
+      const b = makeBall(h, h.tee.p, [h.tee.dx, h.tee.dy, h.tee.dz]);
+      b.quiet = true;
+      const r = h.ref;
+      launchAt(h, b, r.t0, r.p[0], r.p[1], r.p[2], r.v[0], r.v[1], r.v[2], null);
+      for (let i = 0; i < 120 * 30 && b.mode !== HOLED && b.mode !== REST; i++) {
+        stepBall(h, b);
+        const d = v(ballPos(h, b, P)).distanceTo(lava);
+        if (d < best && b.mode === FLY && i > 120) {
+          best = d;
+          bestI = i;
+        }
+      }
+    }
+    const me = fly(h, view, (b, i) => i >= bestI);
     const pos = v(me.p);
     const vel = new THREE.Vector3(me.b.vx, me.b.vy, me.b.vz).normalize();
-    const w = h.worms[0];
-    const exit = v([w.b.x, w.b.y, w.b.z]);
-    const entry = v([w.a.x, w.a.y, w.a.z]);
-    const up = nearestUp(h, t, me.p);
-    const sideways = vel.clone().cross(up).normalize();
-    const eye = pos.clone().addScaledVector(sideways, 9).addScaledVector(up, 2.5).addScaledVector(vel, -2);
-    place(gfx, eye, pos.clone().lerp(exit, 0.3).lerp(entry, 0.1), up, 58);
-    world.holeView.update(t, 0, true);
+    const away = pos.clone().sub(lava).normalize();
+    const side = new THREE.Vector3().crossVectors(vel, away).normalize();
+    const eye = pos.clone().addScaledVector(vel, -num('back', 7)).addScaledVector(away, num('up', 4)).addScaledVector(side, num('side', 3));
+    fov = num('fov', 60);
+    place(gfx, eye, pos.clone().lerp(lava, num('toward', 0.35)), away, fov);
+  } else if (kind === 'thumb4') {
+    // The whole shot as an orbit diagram: the system from above, the ball's path drawn from tee to cup.
+    const h = prepareHole(show);
+    world.setHole(h, 41);
+    const view = new BallView(gfx, LOOK, false, { trail: 420, width: 9, step: 0.45, scale: 5, cues: false });
+    fly(h, view, (b) => b.mode === ROLL && b.g === h.cup.p && b.rolled > 2);
+    const lo = new THREE.Vector3(1e9, 1e9, 1e9);
+    const hi = new THREE.Vector3(-1e9, -1e9, -1e9);
+    for (const i of [h.tee.p, h.cup.p, h.planets.findIndex((p) => p.gas)]) {
+      if (i < 0) continue;
+      const c = centre(h, i);
+      lo.min(c);
+      hi.max(c);
+    }
+    const focus = lo.clone().add(hi).multiplyScalar(0.5);
+    const eye = focus.clone().add(new THREE.Vector3(num('ex', -30), num('ey', 62), num('ez', 70)));
+    fov = num('fov', 52);
+    place(gfx, eye, focus.clone().add(new THREE.Vector3(0, -6, 0)), new THREE.Vector3(0, 1, 0), fov);
   } else {
-    // The icon: a cream ball with a coral stripe over an orange world on deep green.
-    const data = { world: 'pebble', seed: 1, par: 2, planets: [{ k: 'dust', c: [0, 0, 0], R: 8, g: 11, lobes: [[0.2, 0.9, 0.3, 0.07, 4], [-0.6, 0.4, 0.5, -0.05, 6], [0.7, 0.2, -0.6, 0.09, 3]] }], tee: { p: 0, d: [0, 1, 0] }, cup: { p: 0, d: [0.4, 0.3, 0.85], r: 0.6 } };
+    // The icon: a cream ball with a coral stripe on top of a small orange world, on deep green.
+    const data = { world: 'pebble', seed: 1, par: 2, planets: [{ k: 'dust', c: [0, 0, 0], R: 4.2, g: 11, lobes: [[0.5, 0.6, 0.6, 0.04, 4], [-0.6, 0.3, 0.7, -0.05, 6], [0.7, 0.2, -0.6, 0.06, 3]] }], tee: { p: 0, d: [0, 1, 0] }, cup: { p: 0, d: [0.4, -0.3, 0.85], r: 0.6 } };
     const h = prepareHole(data);
     world.setHole(h, 9);
-    const p = restOn(world, h, 'me', look, 0, [0, 1, 0], 0);
-    const mine = v(p);
-    const eye = mine.clone().add(new THREE.Vector3(1.6, 1.5, 2.6));
-    place(gfx, eye, mine.clone().add(new THREE.Vector3(0, -0.15, 0)), new THREE.Vector3(0, 1, 0), 36);
-    world.holeView.update(0, 0, true);
+    gfx.setSky(-0.55, 0.7, 0.55, 12);
+    const b = makeBall(h, 0, [0, 1, 0]);
+    const view = new BallView(gfx, LOOK, false, { scale: num('s', 3.2), cues: false });
+    const p = ballPos(h, b, [0, 0, 0]);
+    const top = v(p).addScaledVector(new THREE.Vector3(0, 1, 0), (num('s', 3.2) - 1) * 0.35);
+    view.update(h, 0, top.x, top.y, top.z, 0, 0, 0, DT, false, 1);
+    fov = num('fov', 38);
+    place(gfx, new THREE.Vector3(num('ex', 2.5), num('ey', 7.4), num('ez', 12.5)), new THREE.Vector3(0, num('ty', 2.6), 0), new THREE.Vector3(0, 1, 0), fov);
     world.holeView.cup.visible = false;
   }
-  backdrop.update(0.016, gfx.camera.position, true);
-  world.fx.update(0.02);
+  world.holeView.update(0, 0, true);
   gfx.resize();
-  if (kind === 'icon') {
-    gfx.camera.fov = 36;
-    gfx.camera.updateProjectionMatrix();
-  }
-  // Two frames so lazy shader compiles finish, then flag ready.
-  for (let i = 0; i < 3; i++) {
+  gfx.camera.fov = fov;
+  gfx.camera.updateProjectionMatrix();
+  backdrop.update(0.016, gfx.camera.position, true);
+  // A few frames so lazy shader compiles and the sky bake finish, then flag ready.
+  for (let i = 0; i < 4; i++) {
+    world.holeView.update(0, 0, true);
     gfx.render();
     await new Promise((r) => requestAnimationFrame(r));
   }
   window.__posterReady = true;
 }
-
-function nearestUp(h, t, p) {
-  const { centersAt, MAX_PLANETS } = sim;
-  const c = centersAt(h, t, new Float64Array(MAX_PLANETS * 3));
-  let best = 0;
-  let bd = 1e18;
-  for (let i = 0; i < h.n; i++) {
-    const d = (p[0] - c[i * 3]) ** 2 + (p[1] - c[i * 3 + 1]) ** 2 + (p[2] - c[i * 3 + 2]) ** 2 - h.planets[i].R ** 2;
-    if (d < bd) {
-      bd = d;
-      best = i;
-    }
-  }
-  return new THREE.Vector3(p[0] - c[best * 3], p[1] - c[best * 3 + 1], p[2] - c[best * 3 + 2]).normalize();
-}
-
-import * as sim from './sim/hole.js';

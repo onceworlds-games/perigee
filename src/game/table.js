@@ -32,3 +32,13 @@ export function localTable() {
 /** Keys: the round record and one shot record per player. */
 export const G_KEY = 'g';
 export const shotKey = (pid) => `s.${pid}`;
+
+/** A resting place from the round record: a solid world of this hole and a direction, or null (the tee). The record
+ *  is written by whoever hosts, so it is checked before it indexes anything. */
+export function restOf(r, hole) {
+  if (!r || typeof r !== 'object' || !Number.isInteger(r.g) || r.g < 0 || r.g >= hole.n || !hole.planets[r.g].solid) return null;
+  if (!Array.isArray(r.d) || r.d.length !== 3) return null;
+  const [x, y, z] = r.d;
+  if (![x, y, z].every(Number.isFinite) || x * x + y * y + z * z < 1e-4) return null;
+  return r;
+}

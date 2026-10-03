@@ -11,7 +11,7 @@ const { server, port } = await serve('dist');
 const errors = [];
 const logs = [];
 async function session(width, height, mobile, name, secs) {
-  const b = await launch({ width, height });
+  const b = await launch({ width, height, gpu: true });
   b.on((m) => {
     if (m.method === 'Runtime.exceptionThrown') errors.push(`[${name}] ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
     if (m.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(m.params.type)) logs.push(`[${name}] ${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);

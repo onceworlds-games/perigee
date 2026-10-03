@@ -38,6 +38,7 @@ export class Play {
     this.lastPreviewAt = 0;
     this.shootHeld = false;
     this.okSent = null;
+    this.tags = [];
     this.bindInput();
   }
 
@@ -279,6 +280,7 @@ export class Play {
       this.holeShown = g.h;
       this.introDone = false;
       this.spectate = null;
+      this.autoWatchAt = 0;
       this.session.card = null;
       this.world.setHole(hole, g.holes?.[g.h]?.seed ?? g.h + 1);
       this.ui.hole.textContent = `${g.h + 1}/${g.holes.length} · ${hole.name}`;
@@ -295,6 +297,16 @@ export class Play {
     }
     // The hand (cards in my private values come through the app).
     this.handCards = this.handProvider ? this.handProvider() : [];
+    // Done with the hole: once the moment at the cup has passed, watch a player who is still out there.
+    if ((st === 'holed' || st === 'up') && !this.spectate && this.autoWatchAt && now > this.autoWatchAt && !this.session.replay) {
+      this.autoWatchAt = 0;
+      const ids = g.players.filter((id) => id !== this.me && !g.cur[id]?.holed && !g.cur[id]?.up);
+      if (ids.length) {
+        this.spectate = ids[0];
+        this.camera.mode = 'follow';
+      }
+    }
+    if (st === 'up' && !this.autoWatchAt && !this.spectate) this.autoWatchAt = now + 1500;
     // Camera target: my ball, the spectated ball, or the replay.
     let targetBall = this.session.myBall();
     let targetEntry = this.session.entry(this.me);
@@ -354,6 +366,20 @@ export class Play {
       const top = this.world.project(P[0] + this.camera.up.x * 0.35, P[1] + this.camera.up.y * 0.35, P[2] + this.camera.up.z * 0.35);
       if (top) ballR = Math.max(28, Math.min(140, Math.hypot(top.x - bp.x, top.y - bp.y) + 22));
     }
+    // Name tags over the other balls on screen (nearest first, a few at most), so a crowd of ghosts is people.
+    const tags = this.tags;
+    tags.length = 0;
+    for (const [pid, e] of this.world.balls) {
+      if (pid === this.me || !e.view.visible || e.view.fade < 0.5) continue;
+      const p = e.view.group.position;
+      const d = p.distanceTo(this.world.gfx.camera.position);
+      if (d > 70) continue;
+      const sp = this.world.project(p.x + this.camera.up.x * 0.9, p.y + this.camera.up.y * 0.9, p.z + this.camera.up.z * 0.9);
+      if (!sp || sp.x < 0 || sp.y < 0 || sp.x > this.world.gfx.width || sp.y > this.world.gfx.height) continue;
+      tags.push({ x: sp.x, y: sp.y, d, name: this.names(pid), colour: e.tint, watched: pid === this.spectate });
+    }
+    tags.sort((a, b) => a.d - b.d);
+    if (tags.length > 5) tags.length = 5;
     const left = g.phase === 'play' ? Math.max(0, (g.endsAt - now) / 1000) : -1;
     const showTimer = g.phase === 'play' && (g.firstIn || left < 60);
     if (showTimer && left < 10 && Math.floor(left) !== this.lastTick) {
@@ -379,6 +405,7 @@ export class Play {
       par: hole.par,
       state: st,
       hand: this.handCards.length > 0,
+      tags,
     });
     // Ambience from my ball.
     if (myBall) {
@@ -503,7 +530,9 @@ export class Play {
         this.celebrate(pos, n, ace, mine);
         if (mine) {
           this.screens.toast(resultWord(strokes, par), 'coral', ace ? 3200 : 2000);
-          this.camera.kick(0.25);
+          this.camera.kick(ace ? 0.5 : 0.25);
+          // After a moment at the cup the camera goes to watch someone still playing.
+          this.autoWatchAt = this.clock() + 2800;
           this.onMyHole?.({ strokes, par, ace, b, holeId: this.session.hole?.id, world: this.session.hole?.world, now: this.clock(), endsAt: g?.endsAt ?? 0 });
         } else this.screens.toast(`${this.names(pid)} · ${resultWord(strokes, par)}`, 'ice', 1400);
         break;

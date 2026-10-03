@@ -295,6 +295,14 @@ export { INTRO_MS, DT };
 
 test('cards: a thruster act reaches the host, Long Look is consumed, a mulligan takes a shot back', () => {
   const room = makeRoom(['a', 'b']);
+  // A match whose first draft offered b exactly these three (the host only honours cards the drafts offered).
+  const want = ['mulligan', 'preview', 'thruster'];
+  for (let seed = 1; seed < 100000; seed++) {
+    if (JSON.stringify(draftFor(seed, 0, 'b').slice().sort()) === JSON.stringify(want)) {
+      room.seed = seed;
+      break;
+    }
+  }
   const pages = ['a', 'b'].map((id) => page(room, id));
   pages[0].round.start(['a', 'b'], 0);
   runUntil(room, pages, () => room.table.get(G_KEY).phase === 'play', 10000);
@@ -337,4 +345,71 @@ test('cards: a thruster act reaches the host, Long Look is consumed, a mulligan 
   assert.equal(pages[1].session.state(), 'aim');
   const b = pages[1].session.entry('b').b;
   assert.equal(b.rest.g, cur.rest.g);
+});
+
+test('a forged hand only ever holds cards the drafts offered, and bad records never crash a page', () => {
+  const room = makeRoom(['a', 'b']);
+  const pages = ['a', 'b'].map((id) => page(room, id));
+  pages[0].round.start(['a', 'b'], 0);
+  runUntil(room, pages, () => room.table.get(G_KEY).phase === 'play', 10000);
+  const offered = draftFor(room.seed, 0, 'b');
+  for (const forged of [['magnet', 'magnet', 'magnet'], [offered[0], offered[0], offered[1]], 'magnet', null, [{ x: 1 }, 7, NaN, 'nope'], new Array(500).fill(offered[2])]) {
+    room.priv.b.hand = forged;
+    const hand = pages[0].round.handOf('b');
+    assert.ok(hand.length <= 3);
+    for (const c of hand) assert.ok(offered.includes(c), `${JSON.stringify(forged)} -> ${hand}`);
+    assert.ok(new Set(hand).size === hand.length, 'no card more often than it was offered');
+  }
+  // A record with a rest on a world that doesn't exist, or junk mods, is read as the tee / no mods on every page.
+  const g = room.table.get(G_KEY);
+  room.table.set(G_KEY, { ...g, cur: { ...g.cur, b: { n: 1, rest: { g: 99, d: [0, 1, 0] }, holed: false, up: false } } });
+  room.table.set(shotKey('a'), { h: g.h, n: 1, p: [0, 0, 0], v: [1, 2, 3], at: room.now(), mods: { gplanet: 0, gfactor: 1e308, magnet: 'yes', brake: { from: 0, to: 1e9 } }, acts: { thrust: -5 } });
+  for (let i = 0; i < 30; i++) frame(room, pages, 16);
+  for (const p of pages) {
+    const e = p.session.entry('b');
+    assert.ok(e && Number.isFinite(e.b.rx) && Number.isFinite(e.b.ry), 'b rests at the tee');
+    const a = p.session.entry('a');
+    if (a) for (const v of [a.b.x, a.b.y, a.b.z, a.b.vx]) assert.ok(Number.isFinite(v), 'a junk-mod shot stays finite');
+  }
+});
+
+test('a full table: eight players shoot at once, the host changes, every page agrees and the record stays small', () => {
+  const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+  const room = makeRoom(ids);
+  room.settings = { ...room.settings, holes: 2, cards: 'off' };
+  const pages = ids.map((id) => page(room, id));
+  pages[0].round.start(ids, 0);
+  assert.ok(runUntil(room, pages, () => room.table.get(G_KEY).phase === 'play', 10000));
+  let guard = 0;
+  let changed = false;
+  while (room.table.get(G_KEY).phase !== 'final' && guard++ < 600) {
+    const g = room.table.get(G_KEY);
+    if (g.phase === 'play') for (const p of pages) if (p.session.state() === 'aim') botShoot(p, room);
+    // Halfway through the first hole the host drops; the next one carries on from the record.
+    if (!changed && g.phase === 'play' && ids.filter((id) => g.cur[id].n >= 1).length >= 4) {
+      changed = true;
+      room.connected.delete('p1');
+      room.host = 'p2';
+    }
+    if (g.phase === 'between') for (const p of pages) p.ctx.players().get(p.me).presence = { ok: g.h };
+    runUntil(room, pages, () => pages.some((p) => p.session.state() === 'aim') || room.table.get(G_KEY).phase !== g.phase || room.table.get(G_KEY).h !== g.h, 60000);
+  }
+  const g = room.table.get(G_KEY);
+  assert.equal(g.phase, 'final', 'the round finished');
+  assert.ok(changed, 'the host changed on the way');
+  assert.equal(g.by, 'p2');
+  for (const id of ids) assert.ok(g.scores[id].every((s) => s && s.strokes >= 1 && s.strokes <= s.par + 4), id);
+  // Each page's balls sit where the record says (the dropped host's page is gone, the rest agree).
+  for (const p of pages.slice(1)) {
+    for (const id of ids) {
+      const cur = g.cur[id];
+      const b = p.session.entry(id)?.b;
+      if (!b || cur.holed || cur.up) continue;
+      assert.equal(b.rest.g, cur.rest.g, `${p.me} sees ${id}`);
+    }
+  }
+  // Room state values are limited to 16 KB: a nine-hole record for eight players and seven bots fits with room to spare.
+  const big = { ...g, holes: new Array(9).fill(g.holes[0]), scores: Object.fromEntries([...ids, 'bot-1', 'bot-2', 'bot-3', 'bot-4', 'bot-5', 'bot-6', 'bot-7'].map((id) => [id, new Array(9).fill({ strokes: 6, par: 4, first: false, pickedUp: true })])) };
+  const bytes = new TextEncoder().encode(JSON.stringify(big)).length;
+  assert.ok(bytes < 12000, `round record ${bytes} bytes`);
 });

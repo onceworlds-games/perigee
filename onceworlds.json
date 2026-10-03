@@ -21,18 +21,18 @@
     { "id": "level-10", "name": "Level 10", "description": "Reach level 10.", "icon": "store/badges/level-10.png" }
   ],
   "controls": [
-    { "keys": ["Drag"], "action": "Look around (aim through the camera)" },
+    { "keys": ["Drag"], "action": "Look around: the shot follows the camera" },
+    { "keys": ["W", "A", "S", "D"], "action": "Turn and tilt the aim (or the arrows)" },
+    { "keys": ["Shift"], "action": "Fine aim while held" },
     { "keys": ["Space"], "action": "Hold to charge, release to shoot" },
     { "keys": ["Esc"], "action": "Cancel the shot" },
     { "keys": ["R"], "action": "Look at the cup" },
-    { "keys": ["Wheel"], "action": "Zoom" },
     { "keys": ["1", "2", "3"], "action": "Play a card" },
     { "keys": ["Q"], "action": "Thruster or brake mid-flight" },
-    { "keys": ["F"], "action": "Preview length (solo)" },
     { "keys": ["X"], "action": "Pick up (twice)" },
     { "keys": ["P"], "action": "Replay your last shot" },
     { "keys": ["C"], "action": "Watch the next player" },
-    { "keys": ["Enter"], "action": "Next" }
+    { "keys": ["Wheel", "-", "="], "action": "Zoom" }
   ],
-  "help": "Every hole is a small solar system. Aim with the camera, hold Shoot to charge and let go: the ball curves with gravity, bounces, rolls and drops into the cup. Everyone shoots at once; lowest strokes wins. Alone, play bots, the daily hole, practice or the tour."
+  "help": "Every hole is a small solar system. Look where you want to go (tilt up to loft, down to putt), hold Shoot to charge and let go: the ball curves round the worlds, bounces, rolls and drops into the cup. Everyone shoots at once; lowest strokes wins. Alone, play the bots, the daily hole, practice or the tour."
 }

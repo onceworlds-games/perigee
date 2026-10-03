@@ -4,11 +4,23 @@
 // same code runs in tests.
 import { centersAt, q, num, BALL_R, MAX_PLANETS } from '../sim/hole.js';
 import { makeBall, launchAt, stepBall, planetVel, ballPos, placeBall, distToCup, REST, FLY, ROLL, LOST, HOLED, DT, MAX_SPEED } from '../sim/ball.js';
-import { modsFor } from '../sim/cards.js';
-import { G_KEY, shotKey } from './table.js';
+import { modsFor, cleanMods } from '../sim/cards.js';
+import { G_KEY, shotKey, restOf } from './table.js';
 import { INTRO_MS } from './round.js';
 
 const MAX_CATCHUP = 2400;
+
+/** A shot record's card mods with its acts merged in, cleaned like the host cleans them (records are untrusted). */
+export function shotMods(s, hole) {
+  if (!s || !s.mods || typeof s.mods !== 'object') return null;
+  const m = { ...s.mods };
+  if (s.acts && typeof s.acts === 'object') {
+    if (Number.isInteger(s.acts.thrust)) m.thrust = s.acts.thrust;
+    if (s.acts.brake && typeof s.acts.brake === 'object') m.brake = { from: s.acts.brake.from, to: s.acts.brake.to };
+  }
+  return cleanMods(m, hole.n);
+}
+
 const SNAP_GRACE_MS = 1500;
 const CS = new Float64Array(MAX_PLANETS * 3);
 const P = [0, 0, 0];
@@ -76,8 +88,9 @@ export class Session {
 
   /** Restores or advances one player's ball from the table. */
   syncBall(pid, g, hole, now) {
-    const cur = g.cur[pid];
-    if (!cur) return;
+    const raw = g.cur?.[pid];
+    if (!raw || typeof raw !== 'object') return;
+    const cur = { ...raw, rest: restOf(raw.rest, hole), n: Number.isInteger(raw.n) ? raw.n : 0 };
     const s = this.table.get(shotKey(pid));
     let e = this.balls.get(pid);
     const restKey = `rest.${cur.n}.${cur.rest ? cur.rest.g + ':' + cur.rest.d.join(',') : 'tee'}.${cur.holed ? 'h' : ''}${cur.up ? 'u' : ''}`;
@@ -88,11 +101,7 @@ export class Session {
         const b = e?.b ?? makeBall(hole, cur.rest ? cur.rest.g : hole.tee.p, cur.rest ? cur.rest.d : [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
         if (b.mode !== REST) placeBall(hole, b, cur.rest ? cur.rest.g : hole.tee.p, ...(cur.rest ? cur.rest.d : [hole.tee.dx, hole.tee.dy, hole.tee.dz]));
         b.events.length = 0;
-        const mods = s.mods ? { ...s.mods } : null;
-        if (mods && s.acts) {
-          if (Number.isInteger(s.acts.thrust)) mods.thrust = s.acts.thrust;
-          if (s.acts.brake && Number.isInteger(s.acts.brake.from) && Number.isInteger(s.acts.brake.to)) mods.brake = { from: s.acts.brake.from, to: s.acts.brake.to };
-        }
+        const mods = shotMods(s, hole);
         const relaunch = !!(e && e.rec && e.rec.n === s.n);
         launchAt(hole, b, (s.at - g.t0) / 1000, s.p[0], s.p[1], s.p[2], s.v[0], s.v[1], s.v[2], mods);
         if (relaunch) b.events.length = 0; // an act arrived: the flight is rebuilt, its sounds were already played
@@ -340,13 +349,9 @@ export class Session {
     if (!rec || !hole || !g || rec.h !== g.h) return false;
     const cur = this.myCur();
     const b = makeBall(hole, hole.tee.p, [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
-    const prev = cur?.prev?.rest;
+    const prev = restOf(cur?.prev?.rest, hole);
     if (prev) placeBall(hole, b, prev.g, prev.d[0], prev.d[1], prev.d[2]);
-    const mods = rec.mods ? { ...rec.mods } : null;
-    if (mods && rec.acts) {
-      if (Number.isInteger(rec.acts.thrust)) mods.thrust = rec.acts.thrust;
-      if (rec.acts.brake) mods.brake = rec.acts.brake;
-    }
+    const mods = shotMods(rec, hole);
     launchAt(hole, b, (rec.at - g.t0) / 1000, rec.p[0], rec.p[1], rec.p[2], rec.v[0], rec.v[1], rec.v[2], mods);
     b.quiet = true;
     this.replay = { b, started: this.ctx.clock(), at: rec.at };

@@ -628,6 +628,354 @@ h1.title {
 }
 
 .card {
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 0 0 14px;
+  min-width: min(92vw, 420px);
+  max-width: 92vw;
+  max-height: calc(100vh - var(--sat) - var(--sab) - 170px);
+  overflow: auto;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.card h2 {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 400;
+  margin: 0 0 6px;
+  padding: 10px 16px 8px;
+  letter-spacing: 0.06em;
+  background: var(--orange);
+  color: var(--cream);
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px dashed rgba(17, 32, 28, 0.35);
+}
+.card > :not(h2) {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+.card table.board {
+  width: calc(100% - 28px);
+}
+.card .sub {
+  color: rgba(17, 32, 28, 0.72);
+  font-size: 15px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+.card .badgeline {
+  color: rgba(17, 32, 28, 0.75);
+  margin-top: 10px;
+}
+.card table.board td {
+  border-bottom-color: rgba(17, 32, 28, 0.14);
+}
+.card table.board tr.me td {
+  color: var(--orange);
+}
+.card .cardbtn.pick {
+  background: #fff8ea;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 0 rgba(17, 32, 28, 0.3);
+}
+.card .cardbtn.pick b {
+  color: var(--orange);
+}
+.card .cardbtn.pick:disabled {
+  opacity: 0.4;
+}
+.card .worldbtn {
+  border-color: rgba(17, 32, 28, 0.22);
+  background: rgba(17, 32, 28, 0.05);
+  color: var(--ink);
+}
+.card .pill {
+  border-color: rgba(17, 32, 28, 0.28);
+  color: var(--ink);
+}
+.card .pill.on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--cream);
+}
+.card .swatch.on {
+  border-color: var(--ink);
+}
+.card .locker .group .lbl {
+  color: rgba(17, 32, 28, 0.7);
+}
+table.board {
+  color: var(--ink);
+  padding: 4px 10px 8px;
+}
+.lastround table.board td {
+  border-bottom-color: rgba(17, 32, 28, 0.14);
+}
+.lastround table.board tr.me td {
+  color: var(--orange);
+}
+@keyframes slidein {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slidein-r {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reduced .club .ticket,
+.reduced .club .stamps {
+  animation: none;
+}
+.stamp {
+  position: relative;
+  min-height: 112px;
+  padding: 10px 8px 10px;
+  border-radius: 14px;
+  background: var(--cream);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 14px 30px rgba(0, 0, 0, 0.4);
+  outline: 2px dashed rgba(17, 32, 28, 0.28);
+  outline-offset: -7px;
+  transition: transform 0.1s ease;
+}
+.stamp:active {
+  transform: translateY(3px) rotate(-1deg);
+}
+.stamp:disabled {
+  opacity: 0.45;
+}
+.stamp .st-icon {
+  display: block;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+}
+.stamp .st-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.stamp b {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.stamp small {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(17, 32, 28, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.stamp.daily {
+  background: #f6e6c4;
+}
+.stamp.practice {
+  background: #e3efe0;
+}
+.stamp.tour {
+  background: #f4dccb;
+}
+.stamp.locker {
+  background: #e2eef0;
+}
+.club .level {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.club .level .lv-n {
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 var(--ink);
+}
+.club .level .xp {
+  flex: 1;
+}
+
+/* Phones held upright: the ticket on top (two columns of settings), the stamps in a row above the strip. */
+@media (max-width: 600px) {
+  .club .ticket {
+    left: calc(var(--sal) + 12px);
+    right: calc(var(--sar) + 12px);
+    top: calc(var(--sat) + 66px);
+    width: auto;
+  }
+  .club .tk-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    padding: 4px 8px 6px;
+  }
+  .club .tk-row {
+    flex-wrap: wrap;
+    gap: 0;
+    min-height: 0;
+    padding: 4px 0 4px 4px;
+  }
+  .club .tk-k {
+    flex-basis: 100%;
+    font-size: 11px;
+  }
+  .club .tk-row.edit .tk-v {
+    min-width: 0;
+    flex: 1;
+    font-size: 15px;
+  }
+  .club .tk-row:not(.edit) .tk-v {
+    text-align: left;
+    font-size: 15px;
+    min-height: 32px;
+    line-height: 32px;
+  }
+  .club .tk-arrow {
+    width: 36px;
+    height: 40px;
+  }
+  .club .stamps {
+    left: calc(var(--sal) + 12px);
+    right: calc(var(--sar) + 12px);
+    top: auto;
+    bottom: calc(var(--sab) + 92px);
+    width: auto;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .club .stamp {
+    min-height: 84px;
+    padding: 6px 2px;
+  }
+  .club .stamp .st-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .club .stamp b {
+    font-size: 14px;
+  }
+  .club .stamp small {
+    font-size: 11px;
+  }
+  .club .lastround {
+    display: none;
+  }
+}
+/* Phones held sideways: the ticket on the left, the stamps on the right, both short. */
+@media (max-height: 500px) and (min-width: 601px) {
+  .club .ticket {
+    top: calc(var(--sat) + 62px);
+    width: min(330px, 42vw);
+  }
+  .club .tk-head {
+    padding: 6px 12px 5px;
+  }
+  .club .tk-title {
+    font-size: 16px;
+  }
+  .club .tk-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 8px;
+    padding: 2px 8px 4px;
+  }
+  .club .tk-row {
+    flex-wrap: wrap;
+    gap: 0;
+    min-height: 0;
+    padding: 2px 0 2px 4px;
+  }
+  .club .tk-k {
+    flex-basis: 100%;
+    font-size: 10px;
+  }
+  .club .tk-v,
+  .club .tk-row.edit .tk-v {
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+    min-height: 32px;
+  }
+  .club .tk-arrow {
+    width: 32px;
+    height: 36px;
+    font-size: 22px;
+  }
+  .club .stamps {
+    top: calc(var(--sat) + 12px);
+    width: min(250px, 32vw);
+    gap: 8px;
+  }
+  .club .stamp {
+    min-height: 74px;
+    padding: 4px 2px;
+  }
+  .club .stamp .st-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .club .stamp b {
+    font-size: 14px;
+  }
+  .club .lastround {
+    display: none;
+  }
+}
+.word {
+  font-family: var(--display);
+  font-size: clamp(36px, 9vw, 80px);
+  letter-spacing: 0.05em;
+  text-shadow: 0 4px 0 var(--ink), 0 10px 30px rgba(0, 0, 0, 0.5);
+  line-height: 1.05;
+  text-align: center;
+}
+.word.coral {
+  color: var(--coral);
+}
+.word.teal {
+  color: var(--ice);
+}
+.sub {
+  font-family: var(--display);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.card {
   background: rgba(17, 32, 28, 0.86);
   border: 3px solid var(--cream);
   border-radius: 22px;

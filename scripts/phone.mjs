@@ -1,7 +1,8 @@
 // A phone-sized touch session on the local platform: opens the game at 390x844 with touch, readies, waits for the
 // first aim and takes screenshots (aiming, charging) so the HUD can be checked around the on-screen controls.
 //   node scripts/phone.mjs [out-dir] [base]
-import { launch } from '/Users/gowravthota/Desktop/commit/onceworlds-games/_tools/mp-lib.mjs';
+// The multi-guest browser driver lives beside the games (MP_LIB points elsewhere).
+const { launch } = await import(process.env.MP_LIB ?? new URL('../../_tools/mp-lib.mjs', import.meta.url).href);
 import { mkdirSync } from 'node:fs';
 
 const out = process.argv[2] ?? '/tmp/perigee-phone';
