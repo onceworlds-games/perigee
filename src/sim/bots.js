@@ -1,17 +1,19 @@
 // Bots: a golfer that plans a shot by trying candidates with the real physics (a cone around the cup plus some
-// exploration), scores each by where it ends, then adds skill-scaled noise. Planning is a generator function so
-// the host's page can spread it over frames (8 candidates a frame) without a hitch.
+// exploration), scores each by where it ends, then adds skill-scaled noise. Planning is a generator function (it
+// yields after every candidate) so the host's page can spread it over frames within a time budget.
 import { makeRng } from './rng.js';
 import { makeBall, launchAt, stepBall, runToRest, planetVel, ballPos, distToCup, REST, HOLED, LOST, DT } from './ball.js';
 import { centersAt, q, MAX_PLANETS } from './hole.js';
 
 // n: candidates; ang/pow: aim and power noise (tan of the angle, fraction); horizon: how far ahead a candidate is
 // judged (seconds); check: how many of the best candidates are flown to the end before choosing.
+// short/long: how the noise scales from a putt to a full drive (rookies hole short putts but rarely hit a long
+// shot true).
 export const TIERS = {
-  rookie: { name: 'Rookie', n: 50, ang: 0.08, pow: 0.09, think: [3, 6], explore: 0.5, horizon: 2.5, check: 0 },
-  club: { name: 'Club', n: 100, ang: 0.06, pow: 0.07, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
-  pro: { name: 'Pro', n: 220, ang: 0.06, pow: 0.07, think: [2, 4], explore: 0.35, horizon: 6, check: 3 },
-  legend: { name: 'Legend', n: 300, ang: 0.045, pow: 0.055, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
+  rookie: { name: 'Rookie', n: 40, ang: 0.09, pow: 0.1, short: 0.3, long: 1.5, think: [3, 6], explore: 0.5, horizon: 3, check: 0 },
+  club: { name: 'Club', n: 90, ang: 0.075, pow: 0.085, short: 0.55, long: 0.9, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
+  pro: { name: 'Pro', n: 150, ang: 0.075, pow: 0.085, short: 0.55, long: 0.9, think: [2, 4], explore: 0.35, horizon: 5, check: 2 },
+  legend: { name: 'Legend', n: 300, ang: 0.065, pow: 0.075, short: 0.55, long: 0.9, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
 };
 export const TIER_IDS = ['rookie', 'club', 'pro', 'legend'];
 export const BOT_NAMES = ['Dot', 'Pip', 'Juniper', 'Bramble', 'Tansy', 'Fig', 'Quill', 'Sorrel', 'Ziggy', 'Marlow', 'Nettle', 'Clove'];
@@ -37,7 +39,7 @@ export function botIdentity(seed, k) {
 }
 
 /**
- * Plans a shot for a resting ball. Yields after every 8 candidates; returns { dir, speed, score, v, p }.
+ * Plans a shot for a resting ball. Yields after every candidate; returns { dir, speed, score, v, p }.
  * `t0` is the hole time the shot would be taken at; `mods` the card mods the bot will ride.
  */
 export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
@@ -57,7 +59,7 @@ export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
   const planSteps = Math.floor(T.horizon * 120);
   const top = []; // the best few, kept sorted best first
   for (let k = 0; k < T.n; k++) {
-    if (k > 0 && (k & 7) === 0) yield k / T.n;
+    if (k > 0) yield k / T.n;
     let dir;
     let speed;
     const r = rng.next();
@@ -140,11 +142,13 @@ export function* planShotSteps(hole, ball, t0, tier, seed, mods = null) {
       yield 1;
     }
   }
-  // Skill noise: a small wobble of the aim and the power.
+  // Skill noise: a wobble of the aim and the power that grows with the length of the shot (a short putt is easier
+  // to hit true than a full drive), so a hole in one stays rare while the short game stays tidy.
+  const reach = T.short + T.long * Math.min(1, best.speed / 30);
   const perp = unit(cross(best.dir, rng.unit()));
-  const a = T.ang * (rng.next() * 2 - 1);
+  const a = T.ang * reach * (rng.next() * 2 - 1);
   const dir = unit([best.dir[0] + perp[0] * a, best.dir[1] + perp[1] * a, best.dir[2] + perp[2] * a]);
-  const speed = Math.max(1.5, Math.min(38, best.speed * (1 + T.pow * (rng.next() * 2 - 1))));
+  const speed = Math.max(1.5, Math.min(38, best.speed * (1 + T.pow * reach * (rng.next() * 2 - 1))));
   const v = [q(dir[0] * speed + vp[0]), q(dir[1] * speed + vp[1]), q(dir[2] * speed + vp[2])];
   return { dir, speed, score: bestScore, p: [q(from[0]), q(from[1]), q(from[2])], v };
 }

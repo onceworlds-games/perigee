@@ -2,7 +2,7 @@
 // the balance harness and the tests (the live game is event-driven and uses the same pieces one shot at a time).
 import { makeRng, seedOf } from './rng.js';
 import { makeBall, launchAt, simulate, distToCup, HOLED, REST, DT } from './ball.js';
-import { planShot, thinkTime } from './bots.js';
+import { planShotSteps, thinkTime } from './bots.js';
 import { strokeCap } from './score.js';
 import { modsFor } from './cards.js';
 
@@ -13,6 +13,15 @@ const HOLE_CAP_STEPS = 120 * 60;
  * Returns { strokes, holed, ace, pickedUp, seconds, shots }.
  */
 export function playHole(hole, tier, seed, opts = {}) {
+  const it = playHoleSteps(hole, tier, seed, opts);
+  for (;;) {
+    const r = it.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** playHole in slices: yields while a shot is planned and after each shot (a page can spread it over frames). */
+export function* playHoleSteps(hole, tier, seed, opts = {}) {
   const rng = makeRng(seedOf(seed, hole.id ?? hole.seed, tier));
   const cap = strokeCap(hole.par);
   const b = makeBall(hole, hole.tee.p, [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
@@ -26,22 +35,24 @@ export function playHole(hole, tier, seed, opts = {}) {
   while (!holed && shots + b.penalties < cap) {
     t += thinkTime(tier, rng);
     let mods = null;
-    let useMulligan = false;
-    if (cardLeft) {
-      if (cardLeft === 'mulligan') useMulligan = true;
-      else {
-        mods = modsFor(cardLeft, b.rest.g);
-        if (mods && mods.thruster) mods.thrust = 60;
-        if (mods && mods.braker) mods.brake = { from: 90, to: 200 };
-      }
+    // A Mulligan is held until a shot goes wrong (a player takes back the bad one, whenever it comes).
+    const useMulligan = cardLeft === 'mulligan';
+    if (cardLeft && !useMulligan) {
+      mods = modsFor(cardLeft, b.rest.g);
+      if (mods && mods.thruster) mods.thrust = 60;
+      if (mods && mods.braker) mods.brake = { from: 90, to: 200 };
       cardLeft = null;
     }
     const before = { g: b.rest.g, dx: b.rest.dx, dy: b.rest.dy, dz: b.rest.dz };
-    let plan = planShot(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), mods);
+    let plan = yield* planShotSteps(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), mods);
     if (mods) {
       // A player looks at the preview with and without the card and keeps it for a better moment if it doesn't help.
-      const plain = planShot(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), null);
-      if (plain.score >= plan.score) {
+      // Cards that only act at the cup (Magnet, Lucky Cup) are insurance: played on the approach, when the shot is
+      // meant to finish near the cup.
+      const plain = yield* planShotSteps(hole, b, t, tier, seedOf(seed, hole.id ?? hole.seed, tier, shots, retries), null);
+      const insurance = mods.magnet || mods.luck;
+      const keep = insurance ? plain.score < -8 : plain.score >= plan.score;
+      if (keep) {
         plan = plain;
         mods = null;
         cardLeft = opts.card;
@@ -51,15 +62,19 @@ export function playHole(hole, tier, seed, opts = {}) {
     shots++;
     const n = simulate(hole, b, HOLE_CAP_STEPS);
     t += n * DT;
+    yield shots;
     if (b.mode === HOLED) holed = true;
     else if (b.mode !== REST) {
       // Still flying at the cap (a long orbit): the hole clock ends it, count it as a pick-up.
       break;
     }
     if (useMulligan && !holed) {
-      // Mulligan: if the shot went badly (lost, the wrong world, or still far from the cup), take it back.
-      const bad = b.penalties > 0 || b.rest.g !== hole.cup.p || distToCup(hole, b) > 5;
+      // Mulligan: if the shot went badly (lost, or it ended further from the cup than it started), take it back.
+      const back0 = makeBall(hole, before.g, [before.dx, before.dy, before.dz]);
+      const worse = distToCup(hole, b) > distToCup(hole, back0) - 1;
+      const bad = b.penalties > 0 || worse || (b.rest.g !== hole.cup.p && before.g === hole.cup.p);
       if (bad) {
+        cardLeft = null;
         b.mode = REST;
         b.penalties = 0;
         shots--;

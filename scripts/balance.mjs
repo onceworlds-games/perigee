@@ -52,23 +52,27 @@ for (const tier of tiers) {
   console.log(`${pad(tier, 8)} ${pad((r.over / r.n >= 0 ? '+' : '') + num(r.over / r.n), 12)} ${pad(num((100 * r.aces) / r.n, 1), 8)} ${pad(num((100 * r.pickups) / r.n, 1), 10)} ${pad(num(r.seconds / r.n, 0), 8)} ${TARGET[tier] ?? ''}`);
 }
 
-// Sensitivity: does a lower grading fraction mean more strokes? Pearson correlation of (1 - frac) with the Club
-// bots' average strokes per hole (absolute, since par itself follows the grade).
+// Grading: do holes graded harder take more strokes? Pearson correlation with the Club bots' average strokes per
+// hole here (fresh seeds, not the ones the grade was measured with): for the bots' grade (what par comes from),
+// for par itself, and for the reference shot's sensitivity (1 - frac), which is kept as a hint, not the grade.
 if (tiers.includes('club')) {
-  const xs = holes.map((h) => 1 - h.data.grade.frac);
   const ys = perHole.map((p) => (p.n ? p.strokes / p.n : 0));
   const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
-  const mx = mean(xs);
-  const my = mean(ys);
-  let sxy = 0;
-  let sxx = 0;
-  let syy = 0;
-  for (let i = 0; i < xs.length; i++) {
-    sxy += (xs[i] - mx) * (ys[i] - my);
-    sxx += (xs[i] - mx) ** 2;
-    syy += (ys[i] - my) ** 2;
-  }
-  console.log(`\ngrade sensitivity vs Club strokes: r = ${num(sxy / Math.sqrt(sxx * syy || 1))}  (positive: harder-graded holes take more strokes)`);
+  const corr = (xs) => {
+    const mx = mean(xs);
+    const my = mean(ys);
+    let sxy = 0;
+    let sxx = 0;
+    let syy = 0;
+    for (let i = 0; i < xs.length; i++) {
+      sxy += (xs[i] - mx) * (ys[i] - my);
+      sxx += (xs[i] - mx) ** 2;
+      syy += (ys[i] - my) ** 2;
+    }
+    return num(sxy / Math.sqrt(sxx * syy || 1));
+  };
+  const graded = holes.every((h) => Number.isFinite(h.data.grade.pro) && Number.isFinite(h.data.grade.club));
+  console.log(`\ngrade vs Club strokes (fresh seeds): bots' grade r = ${graded ? corr(holes.map((h) => h.data.grade.pro + h.data.grade.club)) : '-'}, par r = ${corr(holes.map((h) => h.data.par))}, shot sensitivity r = ${corr(holes.map((h) => 1 - h.data.grade.frac))}`);
   const slow = perHole.reduce((a, p) => a + p.slowest, 0) / perHole.length;
   console.log(`hole duration with the slowest of ${reps} Club bots: ${num(slow, 0)} s (target 45-90 with a group)`);
   const byWorld = {};

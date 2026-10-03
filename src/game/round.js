@@ -15,6 +15,7 @@ import { makeRng, seedOf } from '../sim/rng.js';
 import { G_KEY, shotKey } from './table.js';
 
 export const INTRO_MS = 4500;
+const BOT_BUDGET_MS = 3;
 export const HOLE_CAP_MS = 180000;
 export const AFTER_FIRST_MS = 30000;
 export const BETWEEN_MS = 5000;
@@ -53,8 +54,11 @@ export function pickHoles(kind, settings, seed, extra = {}) {
     else {
       const pair = WORLD_PAIRS[world];
       const w = pair ? pair[i % 2] : world && world !== 'auto' && WORLD_IDS.includes(world) ? world : autoWorld(seed, i, n);
-      // Easy first: the first hole of a round is from the friendly end of its world.
-      const idx = i === 0 ? 1 + rng.int(3) : 1 + rng.int(9);
+      // Easy first: the first hole of a round is from the friendly end of its world (a new player's very first
+      // round opens on the friendliest hole there is). A world's ninth hole, its hardest, is kept for the Tour and
+      // Practice. No hole twice in a round.
+      let idx = i === 0 ? (extra.first && (!world || world === 'auto') ? 1 : 1 + rng.int(3)) : 1 + rng.int(8);
+      for (let k = 0; k < 8 && out.some((e) => e.id === `${w}-${idx}`); k++) idx = (idx % 8) + 1;
       out.push({ src: 'lib', id: `${w}-${idx}` });
     }
   }
@@ -68,6 +72,44 @@ export function holeData(entry) {
   return null;
 }
 
+// Runtime holes (Random, the Daily) are built from their seed by the generator, a slice at a time. The cache is the
+// page's, shared by every round on it, so a hole built ahead (the next hole during this one, the Daily while the
+// player is in the clubhouse, the first Random hole during the countdown) is ready when it's needed.
+const GEN = new Map();
+const JOBS = new Map();
+const GEN_MAX = 12;
+
+/** Spends up to `budgetMs` building the runtime hole of `entry`; returns its data once it's built (else null). */
+export function buildEntry(entry, budgetMs = 2.5) {
+  if (!entry || typeof entry !== 'object') return null;
+  if (entry.src !== 'gen') return holeData(entry);
+  if (!Number.isFinite(entry.seed) || typeof entry.world !== 'string') return holeData({ src: 'lib', id: 'pebble-1' });
+  const done = GEN.get(entry.seed);
+  if (done) return done;
+  let job = JOBS.get(entry.seed);
+  if (!job) {
+    job = generateHoleSteps(entry.world, entry.seed, { candidates: 1800, attempts: 5 });
+    JOBS.set(entry.seed, job);
+  }
+  const t = performance.now();
+  for (;;) {
+    const r = job.next();
+    if (r.done) {
+      const data = r.value ?? holeData({ src: 'lib', id: `${WORLD_IDS.includes(entry.world) ? entry.world : 'pebble'}-1` });
+      GEN.set(entry.seed, data);
+      JOBS.delete(entry.seed);
+      if (GEN.size > GEN_MAX) GEN.delete(GEN.keys().next().value);
+      return data;
+    }
+    if (performance.now() - t > budgetMs) return null;
+  }
+}
+
+/** True when an entry needs no more building. */
+export function entryReady(entry) {
+  return !entry || entry.src !== 'gen' || GEN.has(entry.seed);
+}
+
 export class Round {
   /**
    * ctx: { table, me (my id), clock() (ms), isAuthority(), online() (ids connected), isParticipant(id), players()
@@ -77,8 +119,6 @@ export class Round {
   constructor(ctx) {
     this.ctx = ctx;
     this.table = ctx.table;
-    this.gen = new Map(); // seed -> hole data (built at runtime)
-    this.genJobs = new Map(); // seed -> iterator
     this.holes = new Map(); // index -> prepared hole
     this.balls = new Map(); // pid -> { b, key, acts, done }
     this.bots = new Map(); // pid -> { plan, at, think }
@@ -123,42 +163,12 @@ export class Round {
     if (this.holes.has(i)) return this.holes.get(i);
     const entry = g.holes[i];
     if (!entry) return null;
-    let data = null;
-    if (entry.src === 'lib') data = holeData(entry);
-    else {
-      data = this.gen.get(entry.seed) ?? null;
-      if (!data) {
-        let job = this.genJobs.get(entry.seed);
-        if (!job) {
-          job = generateHoleSteps(entry.world, entry.seed, { candidates: 1800, attempts: 5 });
-          this.genJobs.set(entry.seed, job);
-        }
-        // A slice of work per call (the caller does this every frame): about 2-3 ms.
-        const t = performance.now();
-        for (;;) {
-          const r = job.next();
-          if (r.done) {
-            data = r.value ?? holeData({ src: 'lib', id: `${entry.world}-1` });
-            this.gen.set(entry.seed, data);
-            this.genJobs.delete(entry.seed);
-            break;
-          }
-          if (performance.now() - t > 2.5) return null;
-        }
-      }
-    }
+    // A slice of work per call (the caller does this every frame): about 2-3 ms.
+    const data = buildEntry(entry, 2.5);
     if (!data) return null;
     const hole = prepareHole(data);
     this.holes.set(i, hole);
     return hole;
-  }
-
-  /** The generator's progress for the hole being built (0-1), or 1. */
-  genProgress(i) {
-    const g = this.g();
-    const entry = g?.holes[i];
-    if (!entry || entry.src === 'lib' || this.gen.has(entry.seed)) return 1;
-    return 0.5;
   }
 
   beginHole(g) {
@@ -422,9 +432,14 @@ export class Round {
     return true;
   }
 
-  /** Bots: plan in chunks, wait a human-like while, then shoot. */
+  /** Bots: plan in slices (all of them share a few milliseconds a frame), wait a human-like while, then shoot. */
   runBots(g, hole, now) {
-    for (const pid of Object.keys(g.bots)) {
+    const ids = Object.keys(g.bots);
+    // Whose plan goes first rotates, so with a full table every bot still gets its share of the budget.
+    this.botTurn = ((this.botTurn ?? 0) + 1) % Math.max(1, ids.length);
+    const until = performance.now() + BOT_BUDGET_MS;
+    for (let j = 0; j < ids.length; j++) {
+      const pid = ids[(j + this.botTurn) % ids.length];
       const cur = g.cur[pid];
       if (!cur || cur.holed || cur.up) continue;
       const s = this.table.get(shotKey(pid));
@@ -441,9 +456,12 @@ export class Round {
         this.bots.set(pid, bot);
       }
       if (!bot.result) {
-        const r = bot.plan.next(); // one chunk (8 candidates) per frame per bot
-        if (r.done) bot.result = r.value;
-        continue;
+        // At least one candidate a frame each, then more while the shared budget lasts.
+        do {
+          const r = bot.plan.next();
+          if (r.done) bot.result = r.value;
+        } while (!bot.result && performance.now() < until);
+        if (!bot.result) continue;
       }
       if (now < bot.at) continue;
       const at = Math.max(now, bot.at);

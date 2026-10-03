@@ -2,7 +2,7 @@
 // the scene. The match's rules run in Round (host), every page draws from Session, Play handles the controls.
 import { ow, onPlatform, joinRoom, on, settings, controls, now as pnow, ui, onPlatformEvent, avatarUrl, safe } from './platform.js';
 import { roomTable, localTable, G_KEY } from './table.js';
-import { Round, setLibrary, FINAL_MS } from './round.js';
+import { Round, setLibrary, FINAL_MS, buildEntry, entryReady, pickHoles } from './round.js';
 import { Session } from './session.js';
 import { Play } from './play.js';
 import { Profile, today } from './profile.js';
@@ -23,6 +23,8 @@ import { planShot } from '../sim/bots.js';
 import { MAX_SPEED, makeBall, launchAt, runToRest, ballPos } from '../sim/ball.js';
 import { prepareHole, teePos } from '../sim/hole.js';
 import library from '../../data/holes.json';
+
+const SHOWCASE_SEED = 3728827386;
 
 export const JOIN_OPTIONS = {
   mode: 'links',
@@ -204,7 +206,8 @@ export class App {
   /** The title and clubhouse scene: a small solar system turning while a ball flies its orbit into the cup. */
   showShowcase() {
     if (!this.showcase) {
-      const data = library.holes.find((h) => h.id === 'comet-9') ?? library.holes[0];
+      // "Tail Slingshot": a ball swung round a ringed giant into a cup across the system (found by its seed).
+      const data = library.holes.find((h) => h.seed === SHOWCASE_SEED) ?? library.holes.find((h) => h.world === 'comet') ?? library.holes[0];
       this.showcase = new Showcase(this.gfx, this.world, data);
     }
     this.showcase.enter(this.profile.look());
@@ -271,6 +274,7 @@ export class App {
       mid: room.match.id,
       kind: 'match',
       settings: room.settings,
+      extra: { first: (this.profile.data.stats.holes ?? 0) === 0 },
     };
     this.round = new Round(ctx);
     this.session = new Session({ table: ctx.table, me: ctx.me, clock: ctx.clock, isParticipant: (id) => room.isParticipant(id), onEvent: (...a) => this.play?.onEvent(...a) });
@@ -538,6 +542,9 @@ export class App {
         return;
       }
       if (this.screens.name === 'building') this.screens.clear();
+      // Build the next runtime hole ahead, a little each frame (on every page: each builds its own copy).
+      const next = valid?.holes?.[valid.h + 1];
+      if (next && !entryReady(next)) buildEntry(next, valid.phase === 'between' ? 3 : 1);
       this.session.update(valid, hole, now, dtMs);
       this.phaseScreens(valid, hole, now);
       if (valid && hole && (valid.phase === 'play' || valid.phase === 'intro')) {
@@ -554,9 +561,26 @@ export class App {
       // The clubhouse and the title: the showcase system turns slowly while a ball flies its orbit.
       if (this.showcase) this.showcase.update(dt, settings.reducedMotion);
       this.hud.clear();
+      this.prebuild();
       this.audio.ambience(dt, { playing: false, reduced: settings.reducedMotion });
     }
     this.backdrop.update(dt, this.gfx.camera.position, settings.reducedMotion);
+  }
+
+  /**
+   * Builds runtime holes before they're asked for: the first Random hole during the countdown, today's Daily while
+   * the player looks around the clubhouse. A slice a frame, so nothing hitches.
+   */
+  prebuild() {
+    const m = this.room?.match;
+    if (m && m.phase === 'starting' && this.room.settings?.world === 'random') {
+      const first = pickHoles('match', this.room.settings, m.seed ?? 1)[0];
+      if (!entryReady(first)) return void buildEntry(first, 4);
+    }
+    if (this.mode === 'club' || this.mode === 'title') {
+      const daily = pickHoles('daily', {}, today())[0];
+      if (!entryReady(daily)) buildEntry(daily, 1.5);
+    }
   }
 
   /** The between-hole card and the final results, once per phase, from the record. */

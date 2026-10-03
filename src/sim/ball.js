@@ -18,7 +18,7 @@ export const STALL_STEPS = 180; // 1.5 s
 export const FREE_STEPS = 720; // 6 s with no gravity at all (between worlds, going nowhere): lost
 export const CUP_SPEED = 5.5;
 export const ORBIT_DECAY_AFTER = 40 * 120; // a flight longer than 40 s loses 0.3% speed a step: no endless orbit
-export const BRAKE = 0.985;
+export const BRAKE = 0.99;
 export const THRUST = 9;
 export const MAGNET_RANGE = 12;
 
@@ -232,7 +232,7 @@ function field(hole, b, px, py, pz, c) {
     const cz = c[cp.p * 3 + 2] + cp.dz * cp.radial - pz;
     const d = Math.sqrt(cx * cx + cy * cy + cz * cz);
     if (d < MAGNET_RANGE && d > 0.01) {
-      const f = (2.2 * (1 - d / MAGNET_RANGE)) / d;
+      const f = (3.6 * (1 - d / MAGNET_RANGE)) / d;
       ax += cx * f;
       ay += cy * f;
       az += cz * f;
@@ -593,7 +593,8 @@ export function stepBall(hole, b) {
     if (dx * dx + dy * dy + dz * dz > pl.bound * pl.bound) continue;
     const F = surfaceF(pl, b.x, b.y, b.z, cx, cy, cz);
     if (F >= BALL_R) continue;
-    if (m && m.ghost && !b.ghostUsed) {
+    // Ghost: the first world in the way is passed through, never the cup's own (that's where the ball wants to land).
+    if (m && m.ghost && !b.ghostUsed && i !== hole.cup.p) {
       b.ghostUsed = true;
       b.ghostIn = i;
       ev(b, 'ghostin');

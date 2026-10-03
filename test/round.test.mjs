@@ -273,6 +273,22 @@ test('pickHoles: daily, practice, tour and the world pairs', () => {
   const rnd = pickHoles('match', { holes: 3, world: 'random' }, 9);
   assert.ok(rnd.every((e) => e.src === 'gen' && typeof e.seed === 'number'));
   assert.equal(pickHoles('match', { holes: 99, world: 'auto' }, 1).length, 6, 'absurd settings fall back');
+  // Normal rounds keep each world's ninth (hardest) hole for the Tour and Practice, never repeat a hole, open on one of
+  // a world's three friendliest; a new player's first round opens on the friendliest hole of all.
+  for (let seed = 1; seed < 400; seed++) {
+    for (const world of ['auto', 'pebble-binary', 'lava-ice', 'casino-comet']) {
+      const holes = pickHoles('match', { holes: 9, world }, seed);
+      assert.ok(holes.every((e) => !e.id.endsWith('-9')), `${world} ${seed}`);
+      assert.equal(new Set(holes.map((e) => e.id)).size, holes.length, `${world} ${seed} repeats`);
+      assert.ok(Number(holes[0].id.split('-')[1]) <= 3);
+    }
+  }
+  assert.equal(pickHoles('match', { holes: 6, world: 'auto' }, 77, { first: true })[0].id, 'pebble-1');
+  // The library is ordered easiest first in every world: par never falls as the index rises.
+  for (const w of ['pebble', 'binary', 'lava', 'ice', 'clockwork', 'wormhole', 'casino', 'comet']) {
+    const pars = lib.holes.filter((h) => h.world === w).sort((a, b) => a.index - b.index).map((h) => h.par);
+    assert.deepEqual(pars, pars.slice().sort((a, b) => a - b), w);
+  }
 });
 
 export { INTRO_MS, DT };

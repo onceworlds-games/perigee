@@ -8,7 +8,7 @@
 import { makeRng } from './rng.js';
 import { prepareHole, teePos, basisFor, q } from './hole.js';
 import { makeBall, launchAt, runToRest, planetVel, ballPos, distToCup, REST, HOLED, DT } from './ball.js';
-import { playHole } from './play.js';
+import { playHoleSteps } from './play.js';
 import { buildSystem } from './system.js';
 import { worldById } from './worlds.js';
 import { patchAt, heightAt } from './planet.js';
@@ -89,12 +89,22 @@ function clearance(hole, p) {
  * within 3%) that sink or rest within 2 m of the cup. Deterministic for a given hole and seed.
  */
 export function gradeHole(hole, ref, seed = 7) {
+  const it = gradeHoleSteps(hole, ref, seed);
+  for (;;) {
+    const r = it.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** gradeHole in slices: yields after every copy of the shot (a page builds a hole without a hitch). */
+export function* gradeHoleSteps(hole, ref, seed = 7) {
   const rng = makeRng(seed);
   let sinks = 0;
   let near = 0;
   const b = makeBall(hole, hole.tee.p, [hole.tee.dx, hole.tee.dy, hole.tee.dz]);
   b.quiet = true;
   for (let i = 0; i < PERTURB; i++) {
+    if (i > 0) yield i;
     const perp = unit(cross(ref.dir, rng.unit()));
     const a = TAN_1_5 * (rng.next() * 2 - 1);
     const dir = unit([ref.dir[0] + perp[0] * a, ref.dir[1] + perp[1] * a, ref.dir[2] + perp[2] * a]);
@@ -174,7 +184,7 @@ export function* generateHoleSteps(worldId, seed, opts = {}) {
     const firstPass = dressed ? candidates : Math.floor(candidates * 0.3);
     let placed = false;
     for (let k = 0; k < candidates; k++) {
-      if ((k & 63) === 0) yield { done: attempt * candidates + k, total };
+      yield { done: attempt * candidates + k, total };
       if (!dressed && !placed && k >= firstPass) {
         // Hang the world's gadget on a real flight path, then re-fly near those aims.
         placed = true;
@@ -276,12 +286,12 @@ export function* generateHoleSteps(worldId, seed, opts = {}) {
       const shot = teeShot(h2, vb, cand.t0, cand.dir, cand.speed);
       if (runShot(h2, vb, false) !== HOLED) continue;
       const ref = { t0: cand.t0, dir: cand.dir, speed: cand.speed, p: shot.p, v: shot.v };
-      const grade = gradeHole(h2, ref, seed ^ 0x5bd1e995);
+      const grade = yield* gradeHoleSteps(h2, ref, seed ^ 0x5bd1e995);
       if (grade.frac < 0.03) continue; // a needle shot
       // Par from the sensitivity grade, checked against two Pro bot rounds: a hole the bots find much easier or
       // harder than its grade says moves a stroke.
       let par = parFor(grade.frac);
-      const bot = (playHole(h2, 'pro', 11).strokes + playHole(h2, 'pro', 12).strokes) / 2;
+      const bot = ((yield* playHoleSteps(h2, 'pro', 11)).strokes + (yield* playHoleSteps(h2, 'pro', 12)).strokes) / 2;
       if (bot >= par + 1.5) par = Math.min(4, par + 1);
       else if (bot <= par - 0.9) par = Math.max(2, par - 1);
       grade.bot = bot;
