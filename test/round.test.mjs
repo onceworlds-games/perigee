@@ -211,12 +211,18 @@ test('a reloaded page restores its ball from the record and keeps playing', () =
   }
   // A page that reloads mid-flight resumes from the shot record at the right step.
   if (!cur.holed) {
-    botShoot(again, room);
+    // A high lob, so the ball is surely still in the air when the page comes back.
+    const r = again.session.myBall().rest;
+    const t = Math.abs(r.dy) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+    const side = [r.dy * t[2] - r.dz * t[1], r.dz * t[0] - r.dx * t[2], r.dx * t[1] - r.dy * t[0]];
+    const sl = Math.hypot(...side);
+    const dir = [r.dx * 0.8 + (side[0] / sl) * 0.6, r.dy * 0.8 + (side[1] / sl) * 0.6, r.dz * 0.8 + (side[2] / sl) * 0.6];
+    assert.ok(again.session.shoot(dir, 0.5, room.now()));
     frame(room, [pages[0], again], 1000);
     const late = page(room, 'b');
     frame(room, [pages[0], late], 50);
     const e = late.session.entry('b');
-    assert.ok(e.rec && e.rec.n === cur.n + 1);
+    assert.ok(e.rec && e.rec.n === cur.n + 1, 'the live shot is restored');
     assert.ok(e.b.step > 100, `fast-forwarded to the clock (${e.b.step} steps)`);
   }
 });
