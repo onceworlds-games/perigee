@@ -11,9 +11,9 @@ import { centersAt, q, MAX_PLANETS } from './hole.js';
 // shot true).
 export const TIERS = {
   rookie: { name: 'Rookie', n: 40, ang: 0.09, pow: 0.1, short: 0.3, long: 1.5, think: [3, 6], explore: 0.5, horizon: 3, check: 0 },
-  club: { name: 'Club', n: 90, ang: 0.075, pow: 0.085, short: 0.55, long: 0.9, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
-  pro: { name: 'Pro', n: 150, ang: 0.075, pow: 0.085, short: 0.55, long: 0.9, think: [2, 4], explore: 0.35, horizon: 5, check: 2 },
-  legend: { name: 'Legend', n: 300, ang: 0.065, pow: 0.075, short: 0.55, long: 0.9, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
+  club: { name: 'Club', n: 100, ang: 0.07, pow: 0.08, short: 0.55, long: 0.9, think: [2.5, 5.5], explore: 0.4, horizon: 4, check: 1 },
+  pro: { name: 'Pro', n: 150, ang: 0.09, pow: 0.1, short: 0.55, long: 0.9, think: [2, 4], explore: 0.35, horizon: 5, check: 2 },
+  legend: { name: 'Legend', n: 300, ang: 0.072, pow: 0.082, short: 0.55, long: 0.9, think: [1.5, 3], explore: 0.3, horizon: 6, check: 5 },
 };
 export const TIER_IDS = ['rookie', 'club', 'pro', 'legend'];
 export const BOT_NAMES = ['Dot', 'Pip', 'Juniper', 'Bramble', 'Tansy', 'Fig', 'Quill', 'Sorrel', 'Ziggy', 'Marlow', 'Nettle', 'Clove'];
