@@ -49,6 +49,17 @@ export class Hud {
       c.beginPath();
       c.arc(s.ballX, s.ballY, r, 0, Math.PI * 2);
       c.stroke();
+      // The loft, beside the ring: tilt the camera to change it.
+      if (s.loft !== undefined) {
+        c.font = '700 14px Jost, sans-serif';
+        c.textAlign = 'left';
+        c.fillStyle = 'rgba(243, 229, 195, 0.9)';
+        c.shadowColor = '#11201c';
+        c.shadowOffsetY = 2;
+        c.fillText(`${s.loft}°`, s.ballX + r + 8, s.ballY);
+        c.shadowOffsetY = 0;
+        c.textAlign = 'center';
+      }
       if (s.charge >= 0) {
         const a0 = -Math.PI / 2;
         const a1 = a0 + Math.PI * 2 * s.charge;
@@ -80,8 +91,10 @@ export class Hud {
     }
     // The hole clock and the distance line sit under the hole name: centred, or right of the platform's
     // buttons on a narrow screen.
+    // On a narrow screen everything here sits left-aligned beside the platform's buttons, under the hole name.
     const narrow = this.w < 560;
-    const cx = narrow ? 138 + (this.w - 150) / 2 : this.w / 2;
+    const cx = narrow ? 148 : this.w / 2;
+    c.textAlign = narrow ? 'left' : 'center';
     if (s.timer >= 0) {
       const t = Math.ceil(s.timer);
       c.font = `${s.urgent ? '400 30px' : '400 22px'} Righteous, Jost, sans-serif`;
@@ -102,5 +115,6 @@ export class Hud {
       c.fillText(parts.join('  ·  '), cx, y);
       c.shadowOffsetY = 0;
     }
+    c.textAlign = 'center';
   }
 }

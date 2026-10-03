@@ -63,6 +63,22 @@ body {
 #hud {
   pointer-events: none;
 }
+/* The print: a vignette and a fine paper grain over the scene, under the HUD. */
+.print {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 46%, transparent 58%, rgba(3, 10, 8, 0.5) 100%);
+}
+.print.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 128px 128px;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+}
 #ui {
   position: fixed;
   inset: 0;
@@ -174,12 +190,413 @@ button {
 
 h1.title {
   font-family: var(--display);
-  font-size: clamp(56px, 14vw, 128px);
+  font-size: clamp(44px, min(12vw, 15vh), 116px);
   margin: 0;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--cream);
-  text-shadow: 0 4px 0 var(--ink), 0 8px 0 rgba(216, 106, 42, 0.7), 0 18px 40px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 3px 0 var(--ink), 0 7px 0 rgba(216, 106, 42, 0.85), 0 16px 40px rgba(0, 0, 0, 0.55);
   line-height: 1;
+}
+/* The title: the word above the world, one button below it. */
+.titlescreen {
+  justify-content: space-between;
+  padding-top: calc(var(--sat) + max(64px, 9vh));
+  padding-bottom: calc(var(--sab) + max(40px, 9vh));
+}
+.titlescreen .btn.play {
+  min-width: 240px;
+}
+@media (max-height: 500px) {
+  .titlescreen {
+    padding-top: calc(var(--sat) + 18px);
+    padding-bottom: calc(var(--sab) + 18px);
+  }
+  .titlescreen .btn.play {
+    min-height: 60px;
+    font-size: 26px;
+  }
+}
+.reduced .titlescreen h1 {
+  animation: none;
+}
+.titlescreen h1 {
+  animation: drop 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.titlescreen .btn.play {
+  animation: rise 0.7s 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (hover: none) {
+  .btn .key {
+    display: none;
+  }
+}
+
+/* Paper: the printed look of the clubhouse ticket and the cards between holes. */
+.paper {
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.tk-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 16px 8px;
+  background: var(--orange);
+  color: var(--cream);
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px dashed rgba(17, 32, 28, 0.35);
+}
+.tk-title {
+  font-family: var(--display);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tk-tag {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.tk-rows {
+  padding: 6px 10px 10px;
+}
+.tk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(17, 32, 28, 0.14);
+  padding-left: 6px;
+}
+.tk-row:last-child {
+  border-bottom: 0;
+}
+.tk-k {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(17, 32, 28, 0.62);
+}
+.tk-v {
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.tk-row.edit .tk-v {
+  min-width: 112px;
+  min-height: 44px;
+  text-align: center;
+}
+.tk-arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-family: var(--display);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--orange);
+}
+.tk-arrow:active,
+.tk-row.edit .tk-v:active {
+  background: rgba(216, 106, 42, 0.14);
+}
+.ticket .invite {
+  margin: 0 12px 12px;
+  width: calc(100% - 24px);
+  background: var(--teal);
+  box-shadow: 0 4px 0 #16524e;
+}
+
+/* The clubhouse: the ticket on one side, the stamps on the other, the turning system between them and the
+   platform's Ready strip below. */
+.club {
+  display: block;
+  padding: 0;
+}
+.club .ticket {
+  position: absolute;
+  left: calc(var(--sal) + 20px);
+  top: calc(var(--sat) + 76px);
+  width: 320px;
+  animation: slidein 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+.club .stamps {
+  position: absolute;
+  right: calc(var(--sar) + 20px);
+  top: calc(var(--sat) + 76px);
+  width: 288px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  animation: slidein-r 0.5s 0.08s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+.club .lastround {
+  position: absolute;
+  left: calc(var(--sal) + 20px);
+  bottom: calc(var(--sab) + 100px);
+  width: 320px;
+  max-height: 30vh;
+  overflow: auto;
+}
+.lastround table.board {
+  color: var(--ink);
+  padding: 4px 10px 8px;
+}
+.lastround table.board td {
+  border-bottom-color: rgba(17, 32, 28, 0.14);
+}
+.lastround table.board tr.me td {
+  color: var(--orange);
+}
+@keyframes slidein {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slidein-r {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reduced .club .ticket,
+.reduced .club .stamps {
+  animation: none;
+}
+.stamp {
+  position: relative;
+  min-height: 112px;
+  padding: 10px 8px 10px;
+  border-radius: 14px;
+  background: var(--cream);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 14px 30px rgba(0, 0, 0, 0.4);
+  outline: 2px dashed rgba(17, 32, 28, 0.28);
+  outline-offset: -7px;
+  transition: transform 0.1s ease;
+}
+.stamp:active {
+  transform: translateY(3px) rotate(-1deg);
+}
+.stamp:disabled {
+  opacity: 0.45;
+}
+.stamp .st-icon {
+  display: block;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+}
+.stamp .st-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.stamp b {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.stamp small {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(17, 32, 28, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.stamp.daily {
+  background: #f6e6c4;
+}
+.stamp.practice {
+  background: #e3efe0;
+}
+.stamp.tour {
+  background: #f4dccb;
+}
+.stamp.locker {
+  background: #e2eef0;
+}
+.club .level {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.club .level .lv-n {
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 var(--ink);
+}
+.club .level .xp {
+  flex: 1;
+}
+
+/* Phones held upright: the ticket on top (two columns of settings), the stamps in a row above the strip. */
+@media (max-width: 600px) {
+  .club .ticket {
+    left: calc(var(--sal) + 12px);
+    right: calc(var(--sar) + 12px);
+    top: calc(var(--sat) + 66px);
+    width: auto;
+  }
+  .club .tk-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    padding: 4px 8px 6px;
+  }
+  .club .tk-row {
+    flex-wrap: wrap;
+    gap: 0;
+    min-height: 0;
+    padding: 4px 0 4px 4px;
+  }
+  .club .tk-k {
+    flex-basis: 100%;
+    font-size: 11px;
+  }
+  .club .tk-row.edit .tk-v {
+    min-width: 0;
+    flex: 1;
+    font-size: 15px;
+  }
+  .club .tk-row:not(.edit) .tk-v {
+    text-align: left;
+    font-size: 15px;
+    min-height: 32px;
+    line-height: 32px;
+  }
+  .club .tk-arrow {
+    width: 36px;
+    height: 40px;
+  }
+  .club .stamps {
+    left: calc(var(--sal) + 12px);
+    right: calc(var(--sar) + 12px);
+    top: auto;
+    bottom: calc(var(--sab) + 92px);
+    width: auto;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .club .stamp {
+    min-height: 84px;
+    padding: 6px 2px;
+  }
+  .club .stamp .st-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .club .stamp b {
+    font-size: 14px;
+  }
+  .club .stamp small {
+    font-size: 11px;
+  }
+  .club .lastround {
+    display: none;
+  }
+}
+/* Phones held sideways: the ticket on the left, the stamps on the right, both short. */
+@media (max-height: 500px) and (min-width: 601px) {
+  .club .ticket {
+    top: calc(var(--sat) + 62px);
+    width: min(330px, 42vw);
+  }
+  .club .tk-head {
+    padding: 6px 12px 5px;
+  }
+  .club .tk-title {
+    font-size: 16px;
+  }
+  .club .tk-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 8px;
+    padding: 2px 8px 4px;
+  }
+  .club .tk-row {
+    flex-wrap: wrap;
+    gap: 0;
+    min-height: 0;
+    padding: 2px 0 2px 4px;
+  }
+  .club .tk-k {
+    flex-basis: 100%;
+    font-size: 10px;
+  }
+  .club .tk-v,
+  .club .tk-row.edit .tk-v {
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+    min-height: 32px;
+  }
+  .club .tk-arrow {
+    width: 32px;
+    height: 36px;
+    font-size: 22px;
+  }
+  .club .stamps {
+    top: calc(var(--sat) + 12px);
+    width: min(250px, 32vw);
+    gap: 8px;
+  }
+  .club .stamp {
+    min-height: 74px;
+    padding: 4px 2px;
+  }
+  .club .stamp .st-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .club .stamp b {
+    font-size: 14px;
+  }
+  .club .lastround {
+    display: none;
+  }
 }
 .word {
   font-family: var(--display);
@@ -316,10 +733,11 @@ table.board img {
 .hint {
   position: absolute;
   left: 50%;
-  top: 34%;
+  top: calc(var(--sat) + 112px);
   transform: translateX(-50%);
+  white-space: nowrap;
   font-family: var(--display);
-  font-size: 22px;
+  font-size: 20px;
   letter-spacing: 0.05em;
   color: var(--cream);
   text-shadow: 0 3px 0 var(--ink);
@@ -430,10 +848,18 @@ table.board img {
 }
 .actions.touch {
   right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  flex-direction: row;
-  bottom: calc(var(--sab) + 196px);
+  left: calc(var(--sal) + 10px);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.actions.touch .btn.small {
+  font-size: 15px;
+  min-height: 44px;
+  padding: 0 14px;
 }
 .leftbtns {
   position: absolute;
@@ -585,11 +1011,11 @@ table.board img {
 /* Narrow screens: the platform's buttons own the top-left 130x56 px, so the top bar moves right of them. */
 @media (max-width: 560px) {
   .topbar {
-    left: calc(var(--sal) + 138px);
+    left: calc(var(--sal) + 148px);
     transform: none;
     align-items: flex-start;
     text-align: left;
-    max-width: calc(100vw - 150px - var(--sar));
+    max-width: calc(100vw - 148px - 72px - var(--sar));
   }
   .topbar .hole {
     font-size: 17px;
@@ -605,5 +1031,9 @@ table.board img {
     top: calc(var(--sat) + 70px);
     font-size: 12px;
     max-width: 40vw;
+  }
+  /* A phone shows the leaders and you. */
+  .side .line:nth-child(n + 4):not(.me) {
+    display: none;
   }
 }

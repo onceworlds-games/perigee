@@ -29,8 +29,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TESTING = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
 const CHROME = process.env.CHROME ?? (existsSync(TESTING) ? TESTING : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 
+// gpu: draw with the machine's GPU (Metal on a Mac) instead of the SwiftShader software renderer, which forces the
+// quality governor down and flattens the look. Store art and look checks use it; GPU=0 falls back to software.
 export async function launch({ width = 1280, height = 720, gpu = false } = {}) {
   const profile = mkdtempSync(join(process.env.TMP_PROFILES ?? tmpdir(), 'hb-chrome-'));
+  const real = gpu && process.env.GPU !== '0';
   const args = [
     '--headless=new',
     '--hide-scrollbars',
@@ -39,15 +42,13 @@ export async function launch({ width = 1280, height = 720, gpu = false } = {}) {
     '--autoplay-policy=no-user-gesture-required',
     `--user-data-dir=${profile}`,
     `--window-size=${width},${height}`,
-    '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader',
+    ...(real ? ['--use-angle=metal', '--enable-gpu', '--enable-webgl'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox']),
     '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
     'about:blank',
   ];
-  if (!gpu) args.unshift('--disable-gpu-sandbox');
   const chrome = spawn(CHROME, args, { stdio: 'ignore' });
   // Never leave a browser behind, even when a test crashes.
   process.on('exit', () => {

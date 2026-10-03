@@ -145,7 +145,27 @@ export class Play {
     }
     if (k === 'n') {
       if (this.kind === 'practice') this.onNext?.();
+      return;
     }
+    if (k === '-') this.camera.zoom(1.2);
+    else if (k === '=' || k === '+') this.camera.zoom(-1.2);
+  }
+
+  /** Held keys turn and tilt the camera (and so the aim): A/D or the arrows, W/S; Shift for fine aim. */
+  keyAim(dt, st) {
+    const k = this.input;
+    if (this.session.charging || this.camera.mode === 'intro') return;
+    const watching = st === 'holed' || st === 'up' || st === 'watch';
+    let yr = 0;
+    let pr = 0;
+    if (k.held('a') || (!watching && k.held('ArrowLeft'))) yr += 1;
+    if (k.held('d') || (!watching && k.held('ArrowRight'))) yr -= 1;
+    if (k.held('w') || k.held('ArrowUp')) pr -= 1;
+    if (k.held('s') || k.held('ArrowDown')) pr += 1;
+    if (!yr && !pr) return;
+    const fine = k.held('Shift') ? 0.25 : 1;
+    if (this.camera.mode === 'follow') this.camera.mode = 'orbit';
+    this.camera.nudge(yr * 1.6 * dt * fine, pr * 0.7 * dt * fine);
   }
 
   keyUp(k) {
@@ -253,6 +273,7 @@ export class Play {
     const t = (now - g.t0) / 1000;
     const st = this.session.state();
     const touch = this.touch();
+    this.keyAim(dt, st);
     // Hole change: the intro, the name, the hand.
     if (g.h !== this.holeShown) {
       this.holeShown = g.h;
@@ -297,6 +318,7 @@ export class Play {
       this.camera.setUp(P[0] - c[gi * 3], P[1] - c[gi * 3 + 1], P[2] - c[gi * 3 + 2]);
       if (targetBall.mode === REST && this.camera.mode === 'follow') this.camera.mode = 'orbit';
       this.camera.wantDist = flying ? 13 : 11;
+      this.camera.aiming = st === 'aim' && targetBall === this.session.myBall();
       this.camera.update(dt, hole, t, P[0], P[1], P[2], targetBall.vx, targetBall.vy, targetBall.vz, flying);
     }
     // Preview while aiming.
@@ -345,6 +367,7 @@ export class Play {
       ballR,
       charge: this.session.charging ? this.session.charge : -1,
       aiming: st === 'aim',
+      loft: Math.round((this.camera.loft * 180) / Math.PI),
       timer: showTimer ? left : -1,
       urgent: left >= 0 && left < 10,
       dist: st === 'watch' ? undefined : this.session.distance(),

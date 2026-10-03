@@ -3,7 +3,7 @@
 // solo room where the player is the host and readies straight into a match. Every call is guarded so an SDK
 // failure never throws into the frame loop.
 
-function soloRoom(player) {
+function soloRoom(player, opts = {}) {
   const listeners = new Map();
   const me = { id: player.id, name: player.name, presence: null, team: 0, connected: true, ready: false };
   let started = 0;
@@ -28,7 +28,7 @@ function soloRoom(player) {
     host: me.id,
     closed: false,
     connected: true,
-    settings: {},
+    settings: Object.fromEntries((Array.isArray(opts.settings) ? opts.settings : []).map((s) => [s.id, s.default ?? (typeof s.options[0] === 'object' ? s.options[0].value : s.options[0])])),
     private: priv,
     match: { phase: 'lobby', n: 0, id: '', min: 1, participants: [], seed: 1 },
     spectating: false,
@@ -166,7 +166,7 @@ function standalone() {
     save: { get: async (k) => store.get(k), set: async (k, v) => store.set(k, v), delete: async (k) => store.del(k), list: async () => [] },
     badges: { award: async () => false, list: async () => [], has: async () => false },
     leaderboards: { submit: async () => null, top: async () => ({ entries: [], me: null }) },
-    rooms: { join: async () => soloRoom(player), on: () => () => {}, current: null },
+    rooms: { join: async (opts) => soloRoom(player, opts), on: () => () => {}, current: null },
     ui: { setMenuPosition() {}, requestFullscreen() {}, showInvite() {}, setOrientation() {} },
     controls: { set() {}, stick, pressed: () => false, touch: false },
     settings: { quality: 'high', scale: 1, pixelRatio: (max = 2) => Math.min(window.devicePixelRatio || 1, max), reducedMotion: false, choice: 'auto', on() {} },

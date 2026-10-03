@@ -14,6 +14,7 @@ import { Backdrop } from '../render/backdrop.js';
 import { World } from '../render/world.js';
 import { ChaseCamera } from '../render/camera.js';
 import { Audio } from '../audio/audio.js';
+import { Showcase } from '../render/showcase.js';
 import { draftFor, HAND_MAX } from '../sim/cards.js';
 import { standings, resultWord, parTotal } from '../sim/score.js';
 import { WORLDS, worldById, WORLD_IDS } from '../sim/worlds.js';
@@ -27,7 +28,7 @@ export const JOIN_OPTIONS = {
   mode: 'links',
   maxPlayers: 8,
   minPlayers: 1,
-  lobby: 'card',
+  lobby: 'bar',
   settings: [
     { id: 'holes', label: 'Holes', options: [3, 6, 9], default: 6 },
     {
@@ -95,7 +96,7 @@ export class App {
     this.input.on('keydown', (k) => {
       this.audio.resume();
       if (k === 'Escape' && this.mode === 'club' && this.screens.name !== 'club') this.club();
-      if (k === 'Enter' && this.mode === 'title') this.screens.current?.querySelector('button')?.click();
+      if (k === 'Enter' && this.mode === 'title' && document.activeElement?.tagName !== 'BUTTON') this.screens.current?.querySelector('button')?.click();
     });
   }
 
@@ -112,6 +113,7 @@ export class App {
     this.audio.setPlink(this.profile.look().plink);
     this.profile.onChange(() => {
       this.world.setLook(this.profile.look());
+      this.showcase?.setLook(this.profile.look());
       this.audio.setPlink(this.profile.look().plink);
     });
     this.room = await roomP;
@@ -132,18 +134,26 @@ export class App {
     this.mode = 'title';
     controls.set(null);
     this.showShowcase();
+    // One button over the world: the platform's Ready strip waits for the clubhouse.
+    safe(() => this.room.hideLobby?.(true));
     this.screens.title(() => {
       this.audio.start();
-      this.enter();
+      this.enter(true);
     });
     if (this.auto) setTimeout(() => this.screens.current?.querySelector('button')?.click(), 300);
   }
 
-  /** After the title: the match if one is running, else the clubhouse. */
-  enter() {
+  /**
+   * After the title: the match if one is running, else the clubhouse. Play means play: the player readies at once
+   * (alone in a public server the round starts after the countdown); a private server's host picks and starts.
+   */
+  enter(fromPlay = false) {
     const m = this.room.match;
     if (m.phase === 'playing' || m.phase === 'starting') this.enterMatch();
-    else this.club();
+    else {
+      this.club();
+      if (fromPlay && m.phase === 'lobby' && !(this.room.kind === 'private' && this.room.isHost)) safe(() => this.room.setReady(true));
+    }
   }
 
   club() {
@@ -152,35 +162,53 @@ export class App {
     controls.set(null);
     safe(() => this.room.hideLobby?.(false));
     this.showShowcase();
-    const soloOk = !(this.room.kind === 'private' && this.room.isHost && this.room.players.size > 1);
+    this.drawClub();
+    if (this.auto && this.room.kind === 'solo') setTimeout(() => this.room.setReady(true), 500);
+  }
+
+  /** Draws (or redraws: the host changed a setting, the host moved) the clubhouse. */
+  drawClub() {
+    const room = this.room;
+    const soloOk = !(room.kind === 'private' && room.isHost && room.players.size > 1);
     const d = this.profile.data.daily;
     const day = today();
+    const editable = !!room.isHost && room.match.phase === 'lobby';
     this.screens.clubhouse({
       profile: this.profile,
-      room: this.room,
+      room,
+      schema: JOIN_OPTIONS.settings,
+      values: Object.fromEntries(JOIN_OPTIONS.settings.map((st) => [st.id, room.settings?.[st.id] ?? st.default])),
+      editable,
+      onSetting: (id, value) => {
+        safe(() => room.setSetting(id, value));
+        this.audio.click();
+        this.drawClub();
+      },
       solo: soloOk,
       results: this.results,
       daily: { played: d.day === day, best: d.best, streak: d.last >= day - 1 ? d.streak : 0 },
       onDaily: () => this.startSolo('daily'),
-      onPractice: () => this.screens.practice(this.profile, (id) => this.startSolo('practice', { hole: { src: 'lib', id } }), () => this.club()),
+      onPractice: () => {
+        safe(() => this.room.hideLobby?.(true));
+        this.screens.practice(this.profile, (id) => this.startSolo('practice', { hole: { src: 'lib', id } }), () => this.club());
+      },
       onTour: () => this.startSolo('tour', { stage: this.profile.data.tour.stage }),
-      onLocker: () => this.screens.locker(this.profile, () => this.club()),
+      onLocker: () => {
+        safe(() => this.room.hideLobby?.(true));
+        this.screens.locker(this.profile, () => this.club());
+      },
       onInvite: () => ui.showInvite(),
     });
-    if (this.auto && this.room.kind === 'solo') setTimeout(() => this.room.setReady(true), 500);
   }
 
-  /** The clubhouse scene: a friendly world with the player's ball on the tee, slowly circled. */
+  /** The title and clubhouse scene: a small solar system turning while a ball flies its orbit into the cup. */
   showShowcase() {
-    const data = library.holes.find((h) => h.id === 'pebble-2') ?? library.holes[0];
-    if (!this.showcase) this.showcase = { hole: prepareHole(data), t: 0 };
-    const h = this.showcase.hole;
-    this.world.setHole(h, 2);
-    const tee = teePos(h, 0);
-    this.camera.setUp(h.tee.dx, h.tee.dy, h.tee.dz, true);
-    this.camera.target.set(tee[0], tee[1], tee[2]);
-    this.camera.pitch = 0.25;
-    this.camera.wantDist = 12;
+    if (!this.showcase) {
+      const data = library.holes.find((h) => h.id === 'comet-9') ?? library.holes[0];
+      this.showcase = new Showcase(this.gfx, this.world, data);
+    }
+    this.showcase.enter(this.profile.look());
+    this.showcase.shiftX = 0;
     this.camera.mode = 'orbit';
     this.camera.endIntro();
   }
@@ -201,6 +229,15 @@ export class App {
       if (this.play) this.play.sideKey = '';
     });
     on(room, 'join', (p) => this.loadAvatar(p.id));
+    // The clubhouse shows the settings and who picks them: redraw it when either changes.
+    const redraw = () => {
+      if (this.mode === 'club' && this.screens.name === 'club') this.drawClub();
+    };
+    on(room, 'settings', redraw);
+    on(room, 'host', redraw);
+    on(room, 'match', redraw);
+    on(room, 'join', redraw);
+    on(room, 'leave', redraw);
     on(room, 'message', (data, from) => this.onMessage(data, from));
   }
 
@@ -253,6 +290,7 @@ export class App {
 
   makePlay(kind) {
     this.play?.dispose();
+    this.showcase?.leave();
     const room = this.room;
     this.play = new Play({
       session: this.session,
@@ -468,6 +506,7 @@ export class App {
     const dtMs = this.last ? Math.min(100, t - this.last) : 16;
     this.last = t;
     const dt = dtMs / 1000;
+    if (!settings.reducedMotion) this.gfx.shared.uTime.value = (this.gfx.shared.uTime.value + dt) % 3600;
     try {
       this.step(dt, dtMs);
     } catch (e) {
@@ -512,15 +551,8 @@ export class App {
       }
       if (this.auto) this.autopilot(now);
     } else {
-      // The clubhouse and the title: the showcase world turns slowly.
-      if (this.showcase) {
-        const h = this.showcase.hole;
-        this.showcase.t += dt;
-        this.world.holeView?.update(this.showcase.t, dt, settings.reducedMotion);
-        if (!settings.reducedMotion) this.camera.yaw += dt * 0.12;
-        this.camera.update(dt, h, this.showcase.t, this.camera.target.x, this.camera.target.y, this.camera.target.z, 0, 0, 0, false);
-        this.world.fx.update(dt);
-      }
+      // The clubhouse and the title: the showcase system turns slowly while a ball flies its orbit.
+      if (this.showcase) this.showcase.update(dt, settings.reducedMotion);
       this.hud.clear();
       this.audio.ambience(dt, { playing: false, reduced: settings.reducedMotion });
     }

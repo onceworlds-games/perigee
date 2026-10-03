@@ -4,11 +4,22 @@ import * as THREE from 'three';
 import { HoleView } from './planets.js';
 import { BallView, PreviewDots } from './ball.js';
 import { Fx } from './fx.js';
-import { ballPos, HOLED, LOST, FLY, ROLL, DT } from '../sim/ball.js';
+import { ballPos, HOLED, LOST, FLY, ROLL } from '../sim/ball.js';
+import { basisFor } from '../sim/hole.js';
 import { PALETTE } from './gfx.js';
 
 const TINTS = [0x2a8f8a, 0xd86a2a, 0xd97a8a, 0xbfe3ea, 0x6fae4e, 0xe8c15a, 0x9fb8a8, 0xf06a5c];
 const P = [0, 0, 0];
+const V = new THREE.Vector3();
+
+/** Where the sun sits for a hole: over the tee and the cup, swung to one side so every world shows a terminator. */
+export function sunFor(hole) {
+  const t = [hole.tee.dx, hole.tee.dy, hole.tee.dz];
+  const c = [hole.cup.dx, hole.cup.dy, hole.cup.dz];
+  const { u } = basisFor(t);
+  const s = (hole.seed ?? 1) % 2 ? 1 : -1;
+  return [t[0] + c[0] * 0.55 + u[0] * 0.75 * s, t[1] + c[1] * 0.55 + u[1] * 0.75 * s + 0.25, t[2] + c[2] * 0.55 + u[2] * 0.75 * s];
+}
 
 export class World {
   constructor(gfx) {
@@ -21,8 +32,9 @@ export class World {
     this.replayView = null;
     this.myLook = { body: PALETTE.cream, stripe: PALETTE.coral, trail: PALETTE.coral, flag: PALETTE.coral };
     this.seed = 1;
+    this.seen = new Set();
     gfx.onEvent((what) => {
-      if (what === 'quality' && this.hole) this.setHole(this.hole, this.seed, true);
+      if ((what === 'quality' || what === 'restored') && this.hole) this.setHole(this.hole, this.seed, true);
     });
   }
 
@@ -39,6 +51,10 @@ export class World {
     this.seed = seed;
     this.holeView = hole ? new HoleView(this.gfx, hole, seed) : null;
     if (this.holeView) this.holeView.setFlagColour(this.myLook.flag);
+    if (hole) {
+      const s = sunFor(hole);
+      this.gfx.setSky(s[0], s[1], s[2], (hole.seed ?? seed) >>> 0);
+    }
   }
 
   setLook(look) {
@@ -64,7 +80,8 @@ export class World {
     if (!this.hole || !session.hole) return;
     this.holeView.update(t, dt, reduced);
     let index = 0;
-    const seen = new Set();
+    const seen = this.seen;
+    seen.clear();
     for (const [pid, e] of session.balls) {
       const b = e.b;
       const v = this.ballView(pid, pid === meId, index++);
@@ -88,8 +105,7 @@ export class World {
         v.view.group.scale.setScalar(1);
         v.view.setVisible(true);
       }
-      v.view.update(this.hole, t, P[0], P[1], P[2], b.vx, b.vy, b.vz, dt, flying, fade);
-      if (!flying && b.step === 0) v.view.history.length = Math.max(0, v.view.history.length - 3);
+      v.view.update(this.hole, t, P[0], P[1], P[2], b.vx, b.vy, b.vz, dt, flying, fade, reduced);
     }
     for (const [pid, v] of this.balls) {
       if (!seen.has(pid)) {
@@ -103,7 +119,7 @@ export class World {
       const b = session.replay.b;
       ballPos(this.hole, b, P);
       this.replayView.setVisible(true);
-      this.replayView.update(this.hole, t, P[0], P[1], P[2], b.vx, b.vy, b.vz, dt, b.mode === FLY || b.mode === ROLL, 0.9);
+      this.replayView.update(this.hole, t, P[0], P[1], P[2], b.vx, b.vy, b.vz, dt, b.mode === FLY || b.mode === ROLL, 0.9, reduced);
     } else if (this.replayView) {
       this.replayView.dispose();
       this.replayView = null;
@@ -122,8 +138,8 @@ export class World {
 
   /** Screen position of a world point, or null when behind the camera. */
   project(x, y, z) {
-    const v = new THREE.Vector3(x, y, z).project(this.gfx.camera);
-    if (v.z > 1) return null;
-    return { x: ((v.x + 1) / 2) * this.gfx.width, y: ((1 - v.y) / 2) * this.gfx.height };
+    V.set(x, y, z).project(this.gfx.camera);
+    if (V.z > 1) return null;
+    return { x: ((V.x + 1) / 2) * this.gfx.width, y: ((1 - V.y) / 2) * this.gfx.height };
   }
 }

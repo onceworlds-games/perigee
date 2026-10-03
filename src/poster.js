@@ -148,7 +148,7 @@ export async function run(kind) {
     place(gfx, eye, mine.clone().addScaledVector(toward, 4).addScaledVector(upv, 0.5), upv, 55);
     world.holeView.update(0, 0, true);
     world.planets?.forEach?.(() => {});
-    for (const pv of world.holeView.planets) pv.material.uniforms.uTime.value = 3.1;
+    gfx.shared.uTime.value = 3.1;
   } else if (kind === 'thumb4') {
     // Wormhole Alley: the ball leaving a portal, the other end glowing across the gap.
     const data = library.holes.find((h) => h.feat === 'warp') ?? holeById('wormhole-4');

@@ -7,13 +7,15 @@ const VERT = /* glsl */ `
   attribute float size;
   attribute vec3 tint;
   attribute float life;
+  uniform float uPx;
   varying vec3 vT;
   varying float vL;
   void main() {
     vT = tint;
     vL = life;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * life * (160.0 / max(-mv.z, 1.0));
+    // Sized by distance, but never a blur filling the screen when a puff is next to the camera.
+    gl_PointSize = min(size * (0.4 + 0.6 * life) * (150.0 / max(-mv.z, 1.0)), 26.0) * uPx;
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -25,9 +27,18 @@ const FRAG = /* glsl */ `
     vec2 c = gl_PointCoord - 0.5;
     float r = length(c);
     if (r > 0.5) discard;
-    gl_FragColor = vec4(vT, smoothstep(0.5, 0.25, r) * vL);
+    vec3 col = mix(vT, vec3(1.0, 0.97, 0.9), smoothstep(0.22, 0.0, r) * 0.5);
+    gl_FragColor = vec4(col, smoothstep(0.5, 0.32, r) * min(1.0, vL * 1.6));
+    #include <colorspace_fragment>
   }
 `;
+
+const CACHE = new Map();
+function colourOf(hex) {
+  let c = CACHE.get(hex);
+  if (!c) CACHE.set(hex, (c = new THREE.Color(hex)));
+  return c;
+}
 
 export class Fx {
   constructor(gfx) {
@@ -58,7 +69,8 @@ export class Fx {
     this.geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
     this.geo.setAttribute('tint', new THREE.BufferAttribute(this.tint, 3));
     this.geo.setAttribute('life', new THREE.BufferAttribute(this.life, 1));
-    this.points = new THREE.Points(this.geo, new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false }));
+    this.points = new THREE.Points(this.geo, new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, uniforms: { uPx: this.gfx.shared.uPx } }));
+    this.points.renderOrder = 7;
     this.points.frustumCulled = false;
     this.next = 0;
     this.gfx.scene.add(this.points);
@@ -67,7 +79,8 @@ export class Fx {
   /** Emits `count` particles at p, scattered along n (a surface normal or the velocity) with the given colours. */
   burst(p, n, count, { colours = [PALETTE.cream], speed = 3, size = 1.6, decay = 1.6, spread = 1, pull = 0 } = {}) {
     if (!this.max) return;
-    const cols = colours.map((c) => new THREE.Color(c));
+    const cols = colours.map((c) => colourOf(c));
+    count = Math.min(Math.round(count), this.max);
     for (let k = 0; k < count; k++) {
       const i = this.next;
       this.next = (this.next + 1) % this.max;

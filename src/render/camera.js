@@ -9,6 +9,13 @@ const Y = new THREE.Vector3(0, 1, 0);
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
 const q1 = new THREE.Quaternion();
+// The shot leaves along the camera's heading, lifted by LOFT less the camera's pitch: looking along the ground
+// (the default view) gives a friendly lofted shot, tilting the camera up lofts more, looking down flattens it
+// into a putt.
+export const LOFT = 0.62;
+export const LOFT_MIN = -0.05;
+export const LOFT_MAX = 1.15;
+const SHOULDER = 1.5; // while aiming the camera stands a little to the right, so the preview's arc shows its height
 
 export class ChaseCamera {
   constructor(camera) {
@@ -28,6 +35,10 @@ export class ChaseCamera {
     this.look = new THREE.Vector3();
     this.reduced = false;
     this.aim = new THREE.Vector3(0, 0, -1);
+    this.aiming = false;
+    this.shoulder = 0;
+    this.right = new THREE.Vector3(1, 0, 0);
+    this.loft = LOFT - this.pitch;
   }
 
   /** Sets the frame's up vector with a smooth re-level. */
@@ -144,7 +155,13 @@ export class ChaseCamera {
     // Orbit position in the frame.
     const cp = Math.cos(wantPitch);
     v1.set(Math.sin(wantYaw) * cp, Math.sin(wantPitch), Math.cos(wantYaw) * cp).applyQuaternion(this.frame);
-    this.aim.copy(v1).negate().normalize();
+    // The aim: the heading along the ground, lifted by the loft.
+    this.loft = Math.max(LOFT_MIN, Math.min(LOFT_MAX, LOFT - wantPitch));
+    const ce = Math.cos(this.loft);
+    const se = Math.sin(this.loft);
+    this.aim.set(-Math.sin(wantYaw) * ce, se, -Math.cos(wantYaw) * ce).applyQuaternion(this.frame).normalize();
+    this.right.set(Math.cos(wantYaw), 0, -Math.sin(wantYaw)).applyQuaternion(this.frame);
+    this.shoulder += ((this.aiming ? SHOULDER : 0) - this.shoulder) * (1 - Math.pow(0.001, dt / 0.6));
     const want = v2.copy(this.target).addScaledVector(v1, this.dist);
     // Keep out of worlds: shorten the boom if a planet is in the way or the camera is inside one.
     let dist = this.dist;
@@ -168,7 +185,7 @@ export class ChaseCamera {
         if (s2 > 0 && s2 < dist) dist = Math.min(dist, Math.max(1.2, s2 + 0.2));
       }
     }
-    want.copy(this.target).addScaledVector(v1, dist);
+    want.copy(this.target).addScaledVector(v1, dist).addScaledVector(this.right, this.shoulder * Math.min(1, dist / 6));
     const k = flying ? 1 - Math.pow(0.001, dt / 0.35) : 1 - Math.pow(0.001, dt / 0.12);
     this.pos.lerp(want, k);
     this.keepOut(hole, t, this.pos);
@@ -183,7 +200,7 @@ export class ChaseCamera {
     }
     this.camera.position.copy(this.pos);
     this.camera.up.copy(this.up);
-    v1.copy(this.target).addScaledVector(this.up, 0.6 + sy * 0.3);
+    v1.copy(this.target).addScaledVector(this.up, 0.6 + sy * 0.3).addScaledVector(this.right, this.shoulder * Math.min(1, dist / 6));
     this.camera.lookAt(v1);
     if (sx || sy) this.camera.rotateZ(sx * 0.05);
     // Re-normalize: long sessions must not drift.

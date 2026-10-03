@@ -54,9 +54,10 @@ export class Input {
     const tag = e.target?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    const used = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Escape', 'w', 'a', 's', 'd', 'q', 'e', 'r', 'f', '1', '2', '3', 'x', 'Enter', 'c', 'v', 'z', '-', '=', '+', 'n', 'p'];
-    if (used.includes(k) && k !== 'Tab') e.preventDefault();
-    if (k === 'Tab') e.preventDefault(); // the standings, not the browser's focus ring
+    // Keys the game uses don't scroll or type; Tab keeps moving focus between buttons; a key typed with a
+    // modifier (a browser shortcut) is left alone.
+    const used = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'w', 'a', 's', 'd', 'q', 'e', 'r', 'f', '1', '2', '3', 'x', 'Enter', 'c', '-', '=', '+', 'n', 'p'];
+    if (used.includes(k) && !e.ctrlKey && !e.metaKey && !e.altKey && !(k === 'Enter' && e.target?.tagName === 'BUTTON')) e.preventDefault();
     if (down) {
       if (e.repeat) return;
       this.keys.add(k);

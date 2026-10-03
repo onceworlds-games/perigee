@@ -24,6 +24,14 @@ const button = (label, cls, onClick, key) => {
 };
 const colourHex = (n) => `#${n.toString(16).padStart(6, '0')}`;
 
+// Flat glyphs for the clubhouse stamps (drawn here, in the palette).
+const ICONS = {
+  sun: '<svg viewBox="0 0 48 48"><g fill="#d86a2a"><circle cx="24" cy="24" r="10"/><g stroke="#d86a2a" stroke-width="4" stroke-linecap="round"><path d="M24 4v6M24 38v6M4 24h6M38 24h6M9.9 9.9l4.2 4.2M33.9 33.9l4.2 4.2M38.1 9.9l-4.2 4.2M14.1 33.9l-4.2 4.2"/></g></g></svg>',
+  flag: '<svg viewBox="0 0 48 48"><ellipse cx="24" cy="40" rx="16" ry="5" fill="#2a8f8a"/><ellipse cx="24" cy="39" rx="4" ry="1.6" fill="#11201c"/><path d="M25 39V8" stroke="#11201c" stroke-width="3" stroke-linecap="round"/><path d="M26 8l14 6-14 6z" fill="#f06a5c"/></svg>',
+  ringed: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="12" fill="#d86a2a"/><path d="M14 20h20" stroke="#f3c080" stroke-width="3"/><path d="M13 27h22" stroke="#b85a24" stroke-width="2.5"/><ellipse cx="24" cy="25" rx="22" ry="6.5" fill="none" stroke="#2a8f8a" stroke-width="3.2" transform="rotate(-18 24 25)"/></svg>',
+  ball: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16" fill="#f3e5c3" stroke="#11201c" stroke-width="3"/><path d="M9 21c9 4 21 4 30 0v6c-9 4-21 4-30 0z" fill="#f06a5c"/><circle cx="18" cy="16" r="3.5" fill="#fff" opacity="0.8"/></svg>',
+};
+
 export class Screens {
   constructor(root, app) {
     this.root = root;
@@ -52,10 +60,9 @@ export class Screens {
 
   // ---------------------------------------------------------------- title
   title(onPlay) {
-    const s = $('div', 'screen');
+    const s = $('div', 'screen titlescreen');
     s.append($('h1', 'title', 'Perigee'));
-    s.append($('div', 'sub', 'Golf on tiny worlds'));
-    const b = button('Play', 'big');
+    const b = button('Play', 'big play');
     b.addEventListener('click', () => onPlay());
     s.append(b);
     this.show('title', s);
@@ -63,32 +70,78 @@ export class Screens {
   }
 
   // ---------------------------------------------------------------- clubhouse
-  clubhouse({ profile, room, solo, results, onDaily, onPractice, onTour, onLocker, onInvite, daily }) {
-    const s = $('div', 'screen top lobby');
-    const head = $('div', 'row');
-    const lvl = $('div', 'sub', `Level ${profile.level} · ${profile.look().name}`);
-    head.append(lvl);
-    s.append(head);
-    const xp = $('div', 'xp');
-    const bar = $('i');
+  /**
+   * The lobby: the course ticket (the match settings: the host changes them, everyone sees them), the solo stamps
+   * (daily, practice, tour, locker), the level, the last round. The platform's Ready/Start strip sits under it.
+   */
+  clubhouse({ profile, room, schema, values, editable, onSetting, solo, results, onDaily, onPractice, onTour, onLocker, onInvite, daily }) {
+    const s = $('div', 'screen club');
+    // The course ticket.
+    const t = $('div', 'ticket paper');
+    const head = $('div', 'tk-head');
+    head.append($('span', 'tk-title', 'Course'), $('span', 'tk-tag', editable ? 'Host' : room?.players?.size > 1 ? 'Host picks' : ''));
+    t.append(head);
+    const rows = $('div', 'tk-rows');
+    for (const set of schema) {
+      const opts = set.options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
+      const i = Math.max(0, opts.findIndex((o) => o.value === values[set.id]));
+      const row = $('div', `tk-row${editable ? ' edit' : ''}`);
+      row.append($('span', 'tk-k', set.label));
+      if (editable) {
+        const prev = $('button', 'tk-arrow', '‹');
+        prev.setAttribute('aria-label', `${set.label}: previous`);
+        prev.addEventListener('click', () => onSetting(set.id, opts[(i - 1 + opts.length) % opts.length].value));
+        const next = $('button', 'tk-arrow', '›');
+        next.setAttribute('aria-label', `${set.label}: next`);
+        next.addEventListener('click', () => onSetting(set.id, opts[(i + 1) % opts.length].value));
+        const v = $('button', 'tk-v', opts[i].label);
+        v.addEventListener('click', () => onSetting(set.id, opts[(i + 1) % opts.length].value));
+        row.append(prev, v, next);
+      } else row.append($('span', 'tk-v', opts[i].label));
+      rows.append(row);
+    }
+    t.append(rows);
+    if (onInvite && room && room.players.size < 2) {
+      const inv = button('Invite', 'ghost small invite', onInvite);
+      t.append(inv);
+    }
+    s.append(t);
+    // The stamps: things to do alone while the round waits.
+    const st = $('div', 'stamps');
+    const stamp = (cls, label, sub, icon, onClick, enabled = true) => {
+      const b = $('button', `stamp ${cls}`);
+      const i = $('span', 'st-icon');
+      i.innerHTML = ICONS[icon]; // a constant drawing from this file, never player text
+      b.append(i, $('b', '', label), $('small', '', sub));
+      if (!enabled) b.disabled = true;
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        onClick?.();
+      });
+      st.append(b);
+    };
+    stamp('daily', 'Daily', daily.played ? `Best ${daily.best}` : daily.streak > 0 ? `Streak ${daily.streak}` : 'New', 'sun', onDaily, solo);
+    stamp('practice', 'Practice', '72 holes', 'flag', onPractice, solo);
+    stamp('tour', 'Tour', `Stage ${profile.data.tour.stage + 1}`, 'ringed', onTour, solo);
+    stamp('locker', 'Locker', profile.look().name, 'ball', onLocker);
+    s.append(st);
+    // The level.
+    const lv = $('div', 'level');
     const lo = xpForLevel(profile.level);
     const hi = xpForLevel(profile.level + 1);
+    lv.append($('span', 'lv-n', `Level ${profile.level}`));
+    const xp = $('div', 'xp');
+    const bar = $('i');
     bar.style.width = `${Math.round(100 * Math.min(1, (profile.data.xp - lo) / Math.max(1, hi - lo)))}%`;
     xp.append(bar);
-    xp.style.maxWidth = '320px';
-    s.append(xp);
-    if (results) s.append(this.resultsTable(results, room, true));
-    if (solo) {
-      const row = $('div', 'row');
-      const d = button(daily.played ? `Daily · ${daily.best}` : 'Daily', 'teal', onDaily);
-      row.append(d, button('Practice', 'teal', onPractice), button(`Tour ${profile.data.tour.stage + 1}`, 'teal', onTour));
-      s.append(row);
-      if (daily.streak > 0) s.append($('div', 'badgeline', `Daily streak ${daily.streak}`));
+    lv.append(xp);
+    st.append(lv);
+    if (results && results.length) {
+      const r = $('div', 'lastround paper');
+      r.append($('div', 'tk-head', ''), this.resultsTable(results, room, true));
+      r.firstChild.append($('span', 'tk-title', 'Last round'));
+      s.append(r);
     }
-    const row2 = $('div', 'row');
-    row2.append(button('Locker', 'ghost small', onLocker));
-    if (room && room.players.size < 2 && onInvite) row2.append(button('Invite', 'ghost small', onInvite));
-    s.append(row2);
     this.show('club', s);
     return s;
   }
