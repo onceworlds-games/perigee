@@ -627,17 +627,8 @@ h1.title {
   align-items: center;
 }
 
-.card {
-  background: var(--cream);
-  color: var(--ink);
-  border-radius: 16px;
-  padding: 0 0 14px;
-  min-width: min(92vw, 420px);
-  max-width: 92vw;
-  max-height: calc(100vh - var(--sat) - var(--sab) - 170px);
-  overflow: auto;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 18px 44px rgba(0, 0, 0, 0.45);
-}
+/* Cards (between holes, scorecard, locker, practice) are dark glass with cream ink: the .card rule further down.
+   Paper (ink on cream) is the clubhouse ticket and the last round. */
 .card h2 {
   font-family: var(--display);
   font-size: 21px;
@@ -658,17 +649,12 @@ h1.title {
   width: calc(100% - 28px);
 }
 .card .sub {
-  color: rgba(17, 32, 28, 0.72);
   font-size: 15px;
   margin-top: 12px;
   margin-bottom: 6px;
 }
 .card .badgeline {
-  color: rgba(17, 32, 28, 0.75);
   margin-top: 10px;
-}
-.card table.board td {
-  border-bottom-color: rgba(17, 32, 28, 0.14);
 }
 .card table.board tr.me td {
   color: var(--orange);
@@ -685,28 +671,7 @@ h1.title {
 .card .cardbtn.pick:disabled {
   opacity: 0.4;
 }
-.card .worldbtn {
-  border-color: rgba(17, 32, 28, 0.22);
-  background: rgba(17, 32, 28, 0.05);
-  color: var(--ink);
-}
-.card .pill {
-  border-color: rgba(17, 32, 28, 0.28);
-  color: var(--ink);
-}
-.card .pill.on {
-  background: var(--teal);
-  border-color: var(--teal);
-  color: var(--cream);
-}
-.card .swatch.on {
-  border-color: var(--ink);
-}
-.card .locker .group .lbl {
-  color: rgba(17, 32, 28, 0.7);
-}
 table.board {
-  color: var(--ink);
   padding: 4px 10px 8px;
 }
 .lastround table.board td {
@@ -977,6 +942,7 @@ table.board {
 
 .card {
   background: rgba(17, 32, 28, 0.86);
+  color: var(--cream);
   border: 3px solid var(--cream);
   border-radius: 22px;
   padding: 18px 22px;
