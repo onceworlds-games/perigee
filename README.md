@@ -31,7 +31,7 @@ up, Replay and Quit sit at the left edge, out of the thumbs' way.
 ### Modes and settings
 
 The clubhouse is the lobby: a course ticket with the round's settings, which the host changes and everyone sees,
-and the platform's Ready strip under it. Play on the title readies you at once. The settings: Holes (3 / 6 / 9),
+and the platform's Ready strip under it. The settings: Holes (3 / 6 / 9),
 World (Auto ramp, Random holes built on the spot, or a pair of sibling worlds), Scoring (Strokes, Points, Speed),
 Preview (Short / Long / None), Cards (Off / On) and Fill (bots to 4 or 8). With one player in the server the round
 is played against par and the bots. A new player's first round opens on the friendliest hole; a world's ninth hole,

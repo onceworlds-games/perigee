@@ -94,11 +94,10 @@ export class App {
     this.camera.reduced = settings.reducedMotion;
     if (settings.reducedMotion) document.body.classList.add('reduced');
     // Any gesture inside the game may wake a suspended audio context; Esc backs out of the clubhouse screens.
-    this.input.on('press', () => this.audio.resume());
+    this.input.on('press', () => this.wake());
     this.input.on('keydown', (k) => {
-      this.audio.resume();
+      this.wake();
       if (k === 'Escape' && this.mode === 'club' && this.screens.name !== 'club') this.club();
-      if (k === 'Enter' && this.mode === 'title' && document.activeElement?.tagName !== 'BUTTON') this.screens.current?.querySelector('button')?.click();
     });
   }
 
@@ -126,46 +125,35 @@ export class App {
     this.wireRoom(this.room);
     onPlatformEvent('pause', () => this.pause(true));
     onPlatformEvent('resume', () => this.pause(false));
-    this.title();
+    this.enter();
     requestAnimationFrame((t) => this.frame(t));
     if (this.testing) window.__perigee = this;
   }
 
   // ---------------------------------------------------------------- screens
-  title() {
-    this.mode = 'title';
-    controls.set(null);
-    this.showShowcase();
-    // One button over the world: the platform's Ready strip waits for the clubhouse.
-    safe(() => this.room.hideLobby?.(true));
-    this.screens.title(() => {
+  /** The first gesture starts the audio (browsers need one); later ones wake a suspended context. */
+  wake() {
+    if (!this.audioOn) {
+      this.audioOn = true;
       this.audio.start();
-      this.enter(true);
-    });
-    if (this.auto) setTimeout(() => this.screens.current?.querySelector('button')?.click(), 300);
+    }
+    this.audio.resume();
   }
 
-  /**
-   * After the title: the match if one is running, else the clubhouse. Play means play: the player readies at once
-   * (alone in a public server the round starts after the countdown); a private server's host picks and starts.
-   */
-  enter(fromPlay = false) {
+  /** On load and after a reconnect: the match if one is running, else the clubhouse with the platform's Ready strip. */
+  enter() {
     const m = this.room.match;
     if (m.phase === 'playing' || m.phase === 'starting') this.enterMatch();
-    else {
-      this.club();
-      if (fromPlay && m.phase === 'lobby' && !(this.room.kind === 'private' && this.room.isHost)) safe(() => this.room.setReady(true));
-    }
+    else this.club();
   }
 
   club() {
     this.leaveMatch();
     this.mode = 'club';
     controls.set(null);
-    safe(() => this.room.hideLobby?.(false));
     this.showShowcase();
     this.drawClub();
-    if (this.auto && this.room.kind === 'solo') setTimeout(() => this.room.setReady(true), 500);
+    if (this.auto && this.room.kind === 'solo') setTimeout(() => this.room.setReady(true), 500); // capture path only
   }
 
   /** Draws (or redraws: the host changed a setting, the host moved) the clubhouse. */
@@ -191,12 +179,10 @@ export class App {
       daily: { played: d.day === day, best: d.best, streak: d.last >= day - 1 ? d.streak : 0 },
       onDaily: () => this.startSolo('daily'),
       onPractice: () => {
-        safe(() => this.room.hideLobby?.(true));
         this.screens.practice(this.profile, (id) => this.startSolo('practice', { hole: { src: 'lib', id } }), () => this.club());
       },
       onTour: () => this.startSolo('tour', { stage: this.profile.data.tour.stage }),
       onLocker: () => {
-        safe(() => this.room.hideLobby?.(true));
         this.screens.locker(this.profile, () => this.club());
       },
       onInvite: () => ui.showInvite(),
@@ -426,7 +412,6 @@ export class App {
     this.session = new Session({ table, me: ctx.me, clock, isParticipant: () => true, onEvent: (...a) => this.play?.onEvent(...a) });
     this.roundCtx = ctx;
     this.mode = 'solo';
-    safe(() => room.hideLobby?.(true));
     this.makePlay(kind);
     this.round.start([room.me.id], 0);
   }
@@ -435,7 +420,6 @@ export class App {
     const s = this.solo;
     this.solo = null;
     this.leaveMatch();
-    safe(() => this.room.hideLobby?.(false));
     if (!silent) this.club();
     return s;
   }
