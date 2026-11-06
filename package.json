@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && (vite build -c vite.remix.config.js || echo remix copy skipped)",
     "preview": "vite preview",
     "test": "node --test test/*.test.mjs",
     "balance": "node scripts/balance.mjs",
